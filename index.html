@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>GeoMission — Orange Sonatel</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#FF6600">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GeoMission">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23FF6600'/%3E%3Ccircle cx='90' cy='76' r='28' fill='white'/%3E%3Ccircle cx='90' cy='76' r='12' fill='%23FF6600'/%3E%3Cpath d='M90 104 L90 135' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- SheetJS pour import Excel/CSV -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --brand:#FF6600;--brand-dk:#cc4400;--brand-lt:#fff3eb;
+  --bg:#fff;--bg2:#f7f8fa;--bg3:#f0f1f3;
+  --brd:#e2e4e9;--tx:#0d0f14;--tx2:#4a4f5c;--tx3:#8a8f9e;
+  --sp:#8a8f9e;--rp:#e53935;--vp:#FF6600;--dp:#2e7d32;
+  --ro:#1565c0;--rn:#e53935;--rok:#2e7d32;
+  --r:12px;--sh:0 2px 12px rgba(0,0,0,.1);--sh2:0 8px 32px rgba(0,0,0,.14);
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
+  display:flex;flex-direction:column;height:100dvh;}
+
+/* SPLASH */
+#splash{position:fixed;inset:0;background:white;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .4s;}
+#splash.out{opacity:0;pointer-events:none;}
+.sp-logo{width:80px;height:80px;background:var(--brand);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:42px;box-shadow:0 12px 32px rgba(255,102,0,.35);}
+.sp-name{font-size:26px;font-weight:800;color:var(--tx);}
+.sp-sub{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx3);}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp-spin{width:24px;height:24px;border:3px solid var(--brd);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-top:8px;}
+
+/* INSTALL BANNER */
+#install-banner{background:var(--brand-lt);border-bottom:2px solid var(--brand);padding:10px 14px;display:none;align-items:center;gap:10px;flex-shrink:0;z-index:200;}
+#install-banner.show{display:flex;}
+.ib-icon{font-size:24px;flex-shrink:0;}
+.ib-text{flex:1;}
+.ib-t{font-size:13px;font-weight:700;color:var(--tx);}
+.ib-s{font-size:11px;color:var(--tx2);font-family:'JetBrains Mono',monospace;}
+.ib-btns{display:flex;gap:6px;flex-shrink:0;}
+.ib-btn{padding:6px 12px;border-radius:20px;border:none;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+.ib-btn.install{background:var(--brand);color:white;}
+.ib-btn.dismiss{background:transparent;color:var(--tx3);}
+
+/* OFFLINE BADGE */
+#offline-bar{background:#1a1e28;color:white;text-align:center;padding:4px;font-size:11px;font-family:'JetBrains Mono',monospace;display:none;flex-shrink:0;}
+#offline-bar.show{display:block;}
+
+/* HEADER */
+.hdr{background:var(--brand);color:white;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top,10px));display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.hdr-logo{width:36px;height:36px;background:white;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:var(--brand);flex-shrink:0;}
+.hdr-info{flex:1;min-width:0;}
+.hdr-info h1{font-size:16px;font-weight:800;line-height:1.1;}
+.hdr-info p{font-size:10px;opacity:.82;font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hchips{display:flex;gap:5px;flex-shrink:0;}
+.hchip{background:rgba(255,255,255,.2);border-radius:20px;padding:3px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:3px;}
+.hchip.g{background:rgba(46,125,50,.45);}
+.hchip.r{background:rgba(229,57,53,.45);}
+
+/* MAIN */
+.main{flex:1;position:relative;overflow:hidden;}
+.view{position:absolute;inset:0;display:none;flex-direction:column;}
+.view.active{display:flex;}
+#map-view.active{display:block;}
+#map{width:100%;height:100%;}
+
+/* FABS */
+.fab{position:absolute;bottom:calc(76px + var(--safe-b));right:14px;width:54px;height:54px;
+  background:var(--brand);color:white;border:none;border-radius:50%;font-size:28px;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--sh2);cursor:pointer;z-index:400;transition:transform .12s,background .12s;}
+.fab:active{transform:scale(.9);background:var(--brand-dk);}
+.fab-gps{position:absolute;bottom:calc(142px + var(--safe-b));right:14px;width:42px;height:42px;
+  background:white;color:var(--brand);border:2px solid var(--brand);border-radius:50%;
+  font-size:19px;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh);cursor:pointer;z-index:400;}
+.fab-gps:active{background:var(--brand-lt);}
+
+/* MAP LEGEND */
+.map-legend{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.95);
+  border-radius:10px;padding:8px 10px;box-shadow:var(--sh);z-index:400;font-size:10px;
+  font-family:'JetBrains Mono',monospace;}
+.leg-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.leg-row:last-child{margin-bottom:0;}
+.leg-dot{width:8px;height:8px;border-radius:50%;}
+
+/* BOTTOM NAV */
+.bnav{background:white;border-top:1.5px solid var(--brd);display:flex;
+  height:calc(60px + var(--safe-b));flex-shrink:0;z-index:300;padding-bottom:var(--safe-b);}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border:none;background:none;cursor:pointer;color:var(--tx3);font-family:'Syne',sans-serif;
+  font-size:10px;font-weight:600;transition:color .12s;}
+.bnav-btn.active{color:var(--brand);}
+.bnav-icon{font-size:20px;}
+.bnav-badge{background:var(--rp);color:white;border-radius:10px;padding:1px 5px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;margin-left:3px;display:none;}
+
+/* LIST */
+.list-top{padding:10px 12px 8px;background:white;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.srch{width:100%;padding:9px 12px;border:1.5px solid var(--brd);border-radius:var(--r);
+  font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--bg2);color:var(--tx);outline:none;}
+.srch:focus{border-color:var(--brand);}
+.fchips{display:flex;gap:5px;margin-top:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.fchips::-webkit-scrollbar{display:none;}
+.fchip{padding:4px 11px;border-radius:20px;font-size:11px;font-family:'JetBrains Mono',monospace;
+  border:1.5px solid var(--brd);background:white;color:var(--tx2);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .12s;}
+.fchip.active{background:var(--brand);color:white;border-color:var(--brand);}
+.llist{flex:1;overflow-y:auto;padding:8px 12px 80px;}
+.lcard{background:white;border:1.5px solid var(--brd);border-radius:var(--r);padding:11px;
+  margin-bottom:7px;cursor:pointer;transition:border-color .12s,box-shadow .12s;position:relative;}
+.lcard:active{border-color:var(--brand);box-shadow:0 0 0 3px rgba(255,102,0,.1);}
+.lcard-top{display:flex;align-items:flex-start;gap:8px;}
+.sdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.lcard-name{font-size:14px;font-weight:700;flex:1;line-height:1.3;}
+.rbadge{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:4px;font-weight:600;flex-shrink:0;}
+.rb-optim{background:#e3f0fb;color:var(--ro);}
+.rb-new_site{background:#fdecea;color:var(--rn);}
+.rb-none{background:#e8f5e9;color:var(--rok);}
+.lcard-meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px;margin-left:17px;}
+.mchip{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);}
+.lcard-note{margin-top:4px;margin-left:17px;font-size:12px;color:var(--tx2);line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+/* OVERLAY / MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:1000;display:none;align-items:flex-end;}
+.ov.open{display:flex;}
+.msheet{background:white;border-radius:20px 20px 0 0;width:100%;
+  max-height:92dvh;overflow-y:auto;will-change:transform;}
+.mhandle{width:36px;height:4px;background:var(--brd);border-radius:2px;margin:11px auto 2px;}
+.mhdr{display:flex;align-items:center;justify-content:space-between;padding:4px 16px 12px;border-bottom:1px solid var(--brd);}
+.mtitle{font-size:17px;font-weight:800;}
+.mclose{width:30px;height:30px;border:none;background:var(--bg3);border-radius:50%;font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);}
+.mbody{padding:14px 16px 32px;}
+
+/* FORM */
+.fg{margin-bottom:12px;}
+.flbl{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;display:block;
+  text-transform:uppercase;letter-spacing:.5px;font-family:'JetBrains Mono',monospace;}
+.fi,.fta,.fsel{width:100%;padding:9px 11px;border:1.5px solid var(--brd);border-radius:8px;
+  font-family:'Syne',sans-serif;font-size:14px;background:var(--bg2);color:var(--tx);outline:none;transition:border-color .12s;}
+.fi:focus,.fta:focus,.fsel:focus{border-color:var(--brand);background:white;}
+.fta{resize:vertical;min-height:64px;font-size:13px;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.tgrp{display:flex;gap:5px;flex-wrap:wrap;}
+.tbtn{flex:1;min-width:56px;padding:7px 2px;border:1.5px solid var(--brd);border-radius:7px;
+  background:white;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;
+  text-align:center;transition:all .12s;white-space:nowrap;}
+.tbtn.active{color:white!important;}
+.stg .ts-pending.active{background:var(--sp);border-color:var(--sp);}
+.stg .ts-priority.active{background:var(--rp);border-color:var(--rp);}
+.stg .ts-visiting.active{background:var(--vp);border-color:var(--vp);}
+.stg .ts-visited.active{background:var(--dp);border-color:var(--dp);}
+.rtg .tr-none.active{background:var(--rok);border-color:var(--rok);}
+.rtg .tr-optim.active{background:var(--ro);border-color:var(--ro);}
+.rtg .tr-new_site.active{background:var(--rn);border-color:var(--rn);}
+.gps-row{display:flex;gap:7px;}
+.gps-row .fi{flex:1;}
+.gbtn{padding:9px 13px;background:var(--brand);color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;flex-shrink:0;transition:background .12s;}
+.gbtn:active{background:var(--brand-dk);}
+.pgrid{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;}
+.pthumb{width:68px;height:68px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid var(--brd);}
+.padd{width:68px;height:68px;border-radius:8px;border:2px dashed var(--brd);display:flex;
+  align-items:center;justify-content:center;font-size:22px;color:var(--tx3);cursor:pointer;background:var(--bg2);}
+.btn-save{width:100%;padding:13px;background:var(--brand);color:white;border:none;border-radius:var(--r);
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .12s;}
+.btn-save:active{background:var(--brand-dk);}
+.btn-del{width:100%;padding:11px;background:white;color:#e53935;border:1.5px solid #e53935;border-radius:var(--r);
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:7px;}
+#photo-input{display:none;}
+
+/* DETAIL */
+.det-hero{padding:14px 16px 16px;border-radius:20px 20px 0 0;}
+.det-sbadge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.25);
+  border-radius:20px;padding:3px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;
+  margin-bottom:5px;color:white;}
+.det-name{font-size:21px;font-weight:800;color:white;line-height:1.25;}
+.det-coords{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.8);margin-top:4px;}
+.det-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px;border-bottom:1px solid var(--brd);}
+.abtn{padding:10px;border-radius:8px;border:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
+.ab-edit{background:var(--brand);color:white;}
+.ab-visit{background:#e8f5e9;color:var(--dp);}
+.ab-map{background:var(--bg2);color:var(--tx);}
+.det-sec{padding:12px 16px;border-bottom:1px solid var(--brd);}
+.det-st{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;
+  font-family:'JetBrains Mono',monospace;margin-bottom:8px;}
+.det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.det-item{background:var(--bg2);border-radius:8px;padding:9px;}
+.det-il{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--tx3);text-transform:uppercase;}
+.det-iv{font-size:14px;font-weight:700;margin-top:2px;}
+.cov-box{background:var(--bg2);border-radius:8px;padding:11px;display:flex;align-items:center;gap:10px;}
+.cov-site{font-weight:700;font-size:14px;}
+.cov-dist{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx2);}
+.rec-box{border-radius:8px;padding:11px;display:flex;align-items:flex-start;gap:9px;margin-top:8px;}
+.rec-box.optim{background:#e3f0fb;}
+.rec-box.new_site{background:#fdecea;}
+.rec-box.none{background:#e8f5e9;}
+.rec-txt{font-size:13px;font-weight:700;}
+.rec-sub{font-size:12px;color:var(--tx2);margin-top:2px;line-height:1.4;}
+.det-notes{font-size:13px;line-height:1.6;}
+.det-ts{padding:7px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx3);text-align:center;}
+
+/* REPORT */
+.rpv{overflow-y:auto;padding:14px 12px 90px;}
+.rp-hdr{background:var(--brand);color:white;border-radius:var(--r);padding:14px 16px;margin-bottom:13px;}
+.rp-hdr h2{font-size:17px;font-weight:800;}
+.rp-hdr p{font-family:'JetBrains Mono',monospace;font-size:11px;opacity:.85;margin-top:3px;}
+.rp-pct{font-size:16px;font-weight:700;margin-top:7px;}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;}
+.scard{background:white;border:1.5px solid var(--brd);border-radius:var(--r);padding:11px;text-align:center;}
+.scard .sv{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.scard .sl{font-size:10px;color:var(--tx3);margin-top:1px;}
+.scard.brand .sv{color:var(--brand);}
+.scard.green .sv{color:var(--dp);}
+.scard.red .sv{color:var(--rp);}
+.scard.blue .sv{color:var(--ro);}
+.sec-t{font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;
+  font-family:'JetBrains Mono',monospace;margin-bottom:8px;padding-bottom:5px;border-bottom:2.5px solid var(--brand);}
+.rli{background:white;border:1.5px solid var(--brd);border-radius:8px;padding:11px;margin-bottom:7px;}
+.rli-top{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.rli-name{font-weight:700;font-size:14px;flex:1;}
+.rli-st{font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:600;}
+.rli-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);display:flex;flex-wrap:wrap;gap:5px;}
+.rli-rec{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:4px;font-weight:700;margin-top:5px;display:inline-block;}
+.rli-note{font-size:12px;color:var(--tx2);margin-top:4px;font-style:italic;line-height:1.4;}
+.exp-btn{width:100%;padding:13px;background:var(--brand);color:white;border:none;border-radius:var(--r);
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;
+  display:flex;align-items:center;justify-content:center;gap:8px;}
+.exp-btn:active{background:var(--brand-dk);}
+.exp-btn.sec{background:var(--bg2);color:var(--tx);margin-top:8px;}
+
+/* CONFIRM */
+.cdlg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:24px;}
+.cdlg.open{display:flex;}
+.cdbox{background:white;border-radius:var(--r);padding:20px;width:100%;max-width:320px;box-shadow:var(--sh2);}
+.cdtitle{font-size:17px;font-weight:800;margin-bottom:6px;}
+.cdmsg{font-size:13px;color:var(--tx2);line-height:1.5;}
+.cdbtns{display:flex;gap:8px;margin-top:16px;}
+.cdbtn{flex:1;padding:11px;border-radius:8px;border:none;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+.cdbtn.cancel{background:var(--bg2);color:var(--tx);}
+.cdbtn.ok{background:#e53935;color:white;}
+
+/* PHOTO VIEWER */
+.pv{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:4000;display:none;align-items:center;justify-content:center;padding:16px;}
+.pv.open{display:flex;}
+.pv img{max-width:100%;max-height:88dvh;border-radius:8px;object-fit:contain;}
+.pv-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);border:none;border-radius:50%;
+  width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(72px + var(--safe-b));left:50%;
+  transform:translateX(-50%) translateY(12px);background:#1a1e28;color:white;
+  padding:9px 16px;border-radius:20px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  z-index:5000;opacity:0;transition:opacity .2s,transform .2s;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* EMPTY */
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.empty-t{font-size:17px;font-weight:700;}
+.empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
+
+/* MAP POPUP */
+.leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:var(--sh2)!important;padding:0!important;}
+.leaflet-popup-content{margin:0!important;}
+.mpop{font-family:'Syne',sans-serif;padding:12px;min-width:170px;}
+.mpop-name{font-weight:800;font-size:14px;margin-bottom:3px;}
+.mpop-st{font-size:11px;font-family:'JetBrains Mono',monospace;}
+.mpop-info{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);margin-top:2px;}
+.mpop-btn{margin-top:9px;width:100%;padding:7px;background:var(--brand);color:white;border:none;
+  border-radius:6px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px;}
+
+/* ═══ IMPORT ═══ */
+.imp-zone{border:2.5px dashed var(--brd);border-radius:var(--r);padding:28px 16px;
+  text-align:center;cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:12px;}
+.imp-zone:hover,.imp-zone.drag{border-color:var(--brand);background:var(--brand-lt);}
+.imp-zone-icon{font-size:36px;margin-bottom:8px;}
+.imp-zone-t{font-size:15px;font-weight:700;}
+.imp-zone-s{font-size:12px;color:var(--tx3);margin-top:4px;font-family:'JetBrains Mono',monospace;}
+.imp-zone-formats{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
+.fmt-chip{background:var(--bg3);border-radius:20px;padding:3px 10px;font-size:11px;
+  font-family:'JetBrains Mono',monospace;color:var(--tx2);font-weight:600;}
+#imp-file-input{display:none;}
+.col-map-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.col-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;background:var(--bg2);}
+.col-status{font-size:14px;flex-shrink:0;width:20px;}
+.col-field{font-size:12px;font-family:'JetBrains Mono',monospace;flex:1;font-weight:600;color:var(--tx);}
+.col-arrow{font-size:12px;color:var(--tx3);}
+.col-src{font-size:11px;color:var(--brand);font-family:'JetBrains Mono',monospace;font-weight:600;}
+.col-select{padding:5px 7px;border:1.5px solid var(--brd);border-radius:6px;font-size:11px;
+  font-family:'JetBrains Mono',monospace;background:white;color:var(--tx);outline:none;max-width:140px;}
+.col-select:focus{border-color:var(--brand);}
+.prev-wrap{overflow-x:auto;border-radius:8px;border:1.5px solid var(--brd);margin-bottom:12px;max-height:200px;overflow-y:auto;}
+.prev-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace;}
+.prev-table th{background:var(--brand);color:white;padding:6px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1;}
+.prev-table td{padding:5px 8px;border-bottom:1px solid var(--brd);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;}
+.prev-table tr:nth-child(even) td{background:var(--bg2);}
+.prev-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx2);margin-bottom:10px;
+  padding:9px 12px;background:var(--bg2);border-radius:8px;display:flex;align-items:center;justify-content:space-between;}
+.prev-count strong{color:var(--brand);font-size:18px;}
+.imp-mode{display:flex;gap:7px;margin-bottom:14px;}
+.imp-mode-btn{flex:1;padding:9px 6px;border-radius:8px;border:1.5px solid var(--brd);background:white;
+  font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;text-align:center;transition:all .12s;line-height:1.4;}
+.imp-mode-btn.active{background:var(--brand);color:white;border-color:var(--brand);}
+.btn-import{width:100%;padding:13px;background:var(--brand);color:white;border:none;border-radius:var(--r);
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:background .12s;}
+.btn-import:active{background:var(--brand-dk);}
+.btn-import:disabled{background:var(--tx3);cursor:not-allowed;}
+.imp-step{display:none;}
+.imp-step.active{display:block;}
+.imp-hdr-btn{background:rgba(255,255,255,.2);border:none;border-radius:8px;color:white;
+  padding:6px 10px;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;
+  display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;}
+.imp-hdr-btn:active{background:rgba(255,255,255,.35);}
+.warn-box{background:#fff8e1;border:1.5px solid #ffca28;border-radius:8px;padding:9px 12px;
+  font-size:12px;color:#5d4037;margin-bottom:12px;font-family:'JetBrains Mono',monospace;line-height:1.5;}
+.imp-section-t{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;
+  letter-spacing:.5px;font-family:'JetBrains Mono',monospace;margin-bottom:6px;margin-top:14px;}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="sp-logo">📍</div>
+  <div class="sp-name">GeoMission</div>
+  <div class="sp-sub">Orange Sonatel · Couverture Rurale</div>
+  <div class="sp-spin"></div>
+</div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner">
+  <div class="ib-icon">📲</div>
+  <div class="ib-text">
+    <div class="ib-t">Installer l'application</div>
+    <div class="ib-s">Ajouter à l'écran d'accueil</div>
+  </div>
+  <div class="ib-btns">
+    <button class="ib-btn install" id="btn-install">Installer</button>
+    <button class="ib-btn dismiss" id="btn-dismiss">✕</button>
+  </div>
+</div>
+
+<!-- OFFLINE -->
+<div id="offline-bar">📵 Mode hors connexion — données sauvegardées localement</div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-logo">GM</div>
+  <div class="hdr-info">
+    <h1>GeoMission</h1>
+    <p id="hdr-sub">Évaluation Potentiel Rural</p>
+  </div>
+  <div class="hchips">
+    <button class="imp-hdr-btn" onclick="openImport()">📂 Importer</button>
+    <div class="hchip g">✓<span id="ct-v">0</span></div>
+    <div class="hchip">📍<span id="ct-t">0</span></div>
+    <div class="hchip r">⚡<span id="ct-p">0</span></div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- CARTE -->
+  <div id="map-view" class="view active">
+    <div id="map"></div>
+    <div class="map-legend">
+      <div class="leg-row"><div class="leg-dot" style="background:#8a8f9e"></div>À visiter</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#e53935"></div>Prioritaire</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#FF6600"></div>En cours</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div>Visitée</div>
+    </div>
+    <button class="fab-gps" onclick="goMyLoc()" title="Ma position">🎯</button>
+    <button class="fab" onclick="openAdd()" title="Ajouter">+</button>
+  </div>
+
+  <!-- LISTE -->
+  <div id="list-view" class="view">
+    <div class="list-top">
+      <input type="text" class="srch" id="srch" placeholder="🔍 Rechercher…" oninput="renderList()">
+      <div class="fchips">
+        <div class="fchip active" data-f="all" onclick="setFilter(this)">Toutes</div>
+        <div class="fchip" data-f="pending" onclick="setFilter(this)">À visiter</div>
+        <div class="fchip" data-f="priority" onclick="setFilter(this)">Prioritaires</div>
+        <div class="fchip" data-f="visiting" onclick="setFilter(this)">En cours</div>
+        <div class="fchip" data-f="visited" onclick="setFilter(this)">Visitées</div>
+        <div class="fchip" data-f="new_site" onclick="setFilter(this)">Nouveau site</div>
+        <div class="fchip" data-f="optim" onclick="setFilter(this)">Optim.</div>
+      </div>
+    </div>
+    <div class="llist" id="llist"></div>
+  </div>
+
+  <!-- RAPPORT -->
+  <div id="report-view" class="view">
+    <div class="rpv" id="rpc"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bnav">
+  <button class="bnav-btn active" id="nav-map" onclick="sw('map')">
+    <span class="bnav-icon">🗺️</span>Carte
+  </button>
+  <button class="bnav-btn" id="nav-list" onclick="sw('list')">
+    <span class="bnav-icon">📋</span>Localités
+  </button>
+  <button class="bnav-btn" id="nav-report" onclick="sw('report')">
+    <span class="bnav-icon">📊</span>Rapport
+  </button>
+</nav>
+
+<!-- MODAL AJOUT/ÉDITION -->
+<div class="ov" id="add-ov" onclick="if(event.target===this)closeOv('add-ov')">
+ <div class="msheet">
+  <div class="mhandle"></div>
+  <div class="mhdr">
+    <div class="mtitle" id="add-ttl">Nouvelle Localité</div>
+    <button class="mclose" onclick="closeOv('add-ov')">✕</button>
+  </div>
+  <div class="mbody">
+    <input type="hidden" id="eid">
+
+    <div class="fg">
+      <label class="flbl">Nom de la localité *</label>
+      <input type="text" class="fi" id="fn" placeholder="Ex: Keur Moussa, Thiamène…">
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Coordonnées GPS</label>
+      <div class="gps-row">
+        <input type="number" class="fi" id="flat" placeholder="Latitude" step="0.000001">
+        <input type="number" class="fi" id="flng" placeholder="Longitude" step="0.000001">
+        <button class="gbtn" onclick="captureGPS()" title="Ma position GPS">📍</button>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Statut de visite</label>
+      <div class="tgrp stg">
+        <div class="tbtn ts-pending active" data-s="pending" onclick="selS(this)">À visiter</div>
+        <div class="tbtn ts-priority" data-s="priority" onclick="selS(this)">Prioritaire</div>
+        <div class="tbtn ts-visiting" data-s="visiting" onclick="selS(this)">En cours</div>
+        <div class="tbtn ts-visited" data-s="visited" onclick="selS(this)">Visitée ✓</div>
+      </div>
+    </div>
+
+    <div class="frow">
+      <div class="fg">
+        <label class="flbl">Population estimée</label>
+        <input type="number" class="fi" id="fpop" placeholder="Habitants">
+      </div>
+      <div class="fg">
+        <label class="flbl">Louma (jour)</label>
+        <select class="fsel" id="flouma">
+          <option value="">— Aucun —</option>
+          <option>Lundi</option><option>Mardi</option><option>Mercredi</option>
+          <option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="frow">
+      <div class="fg">
+        <label class="flbl">Marché permanent</label>
+        <select class="fsel" id="fmkt"><option value="0">Non</option><option value="1">Oui ✅</option></select>
+      </div>
+      <div class="fg">
+        <label class="flbl">Axe routier</label>
+        <select class="fsel" id="froad"><option value="0">Non</option><option value="1">Oui ✅</option></select>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Activités économiques</label>
+      <input type="text" class="fi" id="feco" placeholder="Agriculture, Pêche, Commerce, Élevage…">
+    </div>
+
+    <div class="frow">
+      <div class="fg">
+        <label class="flbl">Potentiel estimé</label>
+        <select class="fsel" id="fpot">
+          <option value="">— Non évalué —</option>
+          <option>Faible</option><option>Moyen</option><option>Fort</option><option>Très fort</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="flbl">Pop. abonnés estimée</label>
+        <input type="number" class="fi" id="fsubs" placeholder="Nb abonnés">
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Site de couverture le plus proche</label>
+      <input type="text" class="fi" id="fsite" placeholder="Nom du site RAN (ex: SITE_BAMBEY_1)">
+    </div>
+
+    <div class="frow">
+      <div class="fg">
+        <label class="flbl">Distance site (km)</label>
+        <input type="number" class="fi" id="fdist" placeholder="km" step="0.1">
+      </div>
+      <div class="fg">
+        <label class="flbl">Qualité signal</label>
+        <select class="fsel" id="fsig">
+          <option value="">—</option>
+          <option>Bon</option><option>Moyen</option><option>Faible</option><option>Aucun</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Préconisation couverture</label>
+      <div class="tgrp rtg">
+        <div class="tbtn tr-none active" data-r="none" onclick="selR(this)">✅ OK</div>
+        <div class="tbtn tr-optim" data-r="optim" onclick="selR(this)">📡 Optimisation</div>
+        <div class="tbtn tr-new_site" data-r="new_site" onclick="selR(this)">🏗️ Nouveau site</div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Notes / Observations terrain</label>
+      <textarea class="fta" id="fnotes" placeholder="Observations, contacts locaux, points remarquables, accès route…"></textarea>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Photos (max 3)</label>
+      <div class="pgrid" id="pgrid">
+        <div class="padd" onclick="document.getElementById('photo-input').click()">📷</div>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" multiple onchange="handlePh(event)">
+    </div>
+
+    <button class="btn-save" onclick="saveLoc()">💾 Enregistrer</button>
+    <button class="btn-del" id="del-btn" style="display:none" onclick="askDel()">🗑️ Supprimer cette localité</button>
+  </div>
+ </div>
+</div>
+
+<!-- MODAL DÉTAIL -->
+<div class="ov" id="det-ov" onclick="if(event.target===this)closeOv('det-ov')">
+  <div class="msheet" id="det-sheet"></div>
+</div>
+
+<!-- MODAL IMPORT -->
+<div class="ov" id="imp-ov" onclick="if(event.target===this)closeImp()">
+ <div class="msheet" style="max-height:96dvh">
+  <div class="mhandle"></div>
+  <div class="mhdr">
+    <div class="mtitle" id="imp-ttl">Importer des localités</div>
+    <button class="mclose" onclick="closeImp()">✕</button>
+  </div>
+  <div class="mbody">
+
+    <!-- ÉTAPE 1 : SÉLECTION -->
+    <div class="imp-step active" id="imp-step1">
+      <div class="imp-zone" id="imp-dropzone"
+        onclick="document.getElementById('imp-file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleDrop(event)">
+        <div class="imp-zone-icon">📂</div>
+        <div class="imp-zone-t">Glisser-déposer ou cliquer</div>
+        <div class="imp-zone-s">Sélectionner votre fichier de localités</div>
+        <div class="imp-zone-formats">
+          <span class="fmt-chip">📊 .xlsx</span>
+          <span class="fmt-chip">📗 .xls</span>
+          <span class="fmt-chip">📄 .csv</span>
+        </div>
+      </div>
+      <input type="file" id="imp-file-input" accept=".xlsx,.xls,.csv" onchange="handleImpFile(event)">
+      <div class="warn-box">
+        💡 <strong>Format attendu :</strong> au minimum une colonne <em>Nom</em>, une colonne <em>Latitude</em> et une colonne <em>Longitude</em>. Les autres colonnes sont optionnelles — détectées automatiquement.
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx2);line-height:1.9;">
+        <strong style="color:var(--tx)">Noms de colonnes reconnus :</strong><br>
+        Nom / Name / Localité · Latitude / Lat / Y · Longitude / Lon / Long / X<br>
+        Population / Hab · Louma / Jour_Marché · Marché / Market<br>
+        Axe_Routier / Route · Activités / Activities · Potentiel<br>
+        Site / Site_Proche / Site_RAN · Distance / Dist_km<br>
+        Signal / Qualite_Signal · Préconisation / Rec · Notes / Observations · Statut / Status
+      </div>
+    </div>
+
+    <!-- ÉTAPE 2 : MAPPING + PREVIEW -->
+    <div class="imp-step" id="imp-step2">
+      <div class="prev-count">
+        <span>Lignes valides détectées</span>
+        <strong id="imp-row-count">0</strong>
+      </div>
+
+      <div class="imp-section-t">Correspondance des colonnes</div>
+      <div class="col-map-grid" id="col-map-grid"></div>
+
+      <div class="imp-section-t">Aperçu (5 premières lignes)</div>
+      <div class="prev-wrap"><table class="prev-table" id="prev-table"></table></div>
+
+      <div class="imp-section-t">Mode d'import</div>
+      <div class="imp-mode">
+        <div class="imp-mode-btn active" id="mode-add" onclick="setImpMode('add')">
+          ➕ Ajouter<br><span style="font-size:10px;opacity:.8">aux localités existantes</span>
+        </div>
+        <div class="imp-mode-btn" id="mode-replace" onclick="setImpMode('replace')">
+          🔄 Remplacer<br><span style="font-size:10px;opacity:.8">effacer et remplacer tout</span>
+        </div>
+      </div>
+      <div id="imp-warn-rep" style="display:none" class="warn-box">
+        ⚠️ <strong>Attention :</strong> toutes les localités existantes et leurs photos seront supprimées.
+      </div>
+
+      <button class="btn-import" id="btn-do-import" onclick="doImport()">
+        📥 Importer <span id="imp-btn-n">0</span> localités
+      </button>
+      <button style="width:100%;padding:10px;border:none;background:none;color:var(--tx3);font-family:'Syne',sans-serif;font-size:13px;cursor:pointer;margin-top:6px" onclick="resetImp()">← Choisir un autre fichier</button>
+    </div>
+  </div>
+ </div>
+</div>
+
+<!-- CONFIRM IMPORT REPLACE -->
+<div class="cdlg" id="imp-cdlg">
+  <div class="cdbox">
+    <div class="cdtitle">Remplacer toutes les données ?</div>
+    <div class="cdmsg">Cette action supprimera <strong id="ic-existing">0</strong> localité(s) existante(s) et les remplacera par <strong id="ic-new">0</strong> nouvelle(s). Irréversible.</div>
+    <div class="cdbtns">
+      <button class="cdbtn cancel" onclick="document.getElementById('imp-cdlg').classList.remove('open')">Annuler</button>
+      <button class="cdbtn ok" onclick="confirmReplace()">Remplacer</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div class="cdlg" id="cdlg">
+  <div class="cdbox">
+    <div class="cdtitle" id="cd-t">Confirmer</div>
+    <div class="cdmsg" id="cd-m"></div>
+    <div class="cdbtns">
+      <button class="cdbtn cancel" onclick="closeCd()">Annuler</button>
+      <button class="cdbtn ok" onclick="doDel()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO VIEWER -->
+<div class="pv" id="pv" onclick="closePV()">
+  <button class="pv-close" onclick="event.stopPropagation();closePV()">✕</button>
+  <img id="pv-img" src="" alt="">
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONSTANTES
+// ═══════════════════════════════════════════════
+const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓'};
+const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32'};
+const RL = {none:'Couverture OK',optim:'Optimisation antennaire',new_site:'Nouveau site requis'};
+const RC = {none:'#2e7d32',optim:'#1565c0',new_site:'#e53935'};
+const SORT_ORD = {priority:0,pending:1,visiting:2,visited:3};
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let locs = [];
+let map = null;
+let mkrs = {};
+let curFilter = 'all';
+let cSt = 'pending';
+let cRec = 'none';
+let pendPh = [];
+let editPh = [];
+let tmToast = null;
+let deferredInstall = null;
+
+// ═══════════════════════════════════════════════
+// STORAGE — localStorage
+// ═══════════════════════════════════════════════
+function loadData() {
+  try {
+    const raw = localStorage.getItem('gm_locs');
+    locs = raw ? JSON.parse(raw) : [];
+  } catch(e) { locs = []; }
+}
+
+function saveData() {
+  try { localStorage.setItem('gm_locs', JSON.stringify(locs)); }
+  catch(e) { toast('⚠️ Stockage plein, vérifiez les photos'); }
+}
+
+function savePh(id, i, b64) {
+  try { localStorage.setItem(`gm_ph_${id}_${i}`, b64); }
+  catch(e) { console.warn('Photo storage error', e); }
+}
+
+function loadPh(id, i) {
+  return localStorage.getItem(`gm_ph_${id}_${i}`);
+}
+
+function delPhs(id, n) {
+  for (let i = 0; i < n; i++)
+    localStorage.removeItem(`gm_ph_${id}_${i}`);
+}
+
+// ═══════════════════════════════════════════════
+// CARTE
+// ═══════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', { center: [14.3, -14.5], zoom: 7, zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(map);
+
+  // Essai position GPS
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      p => map.setView([p.coords.latitude, p.coords.longitude], 10),
+      () => {}
+    );
+  }
+
+  // Double-tap = ajouter à cet endroit
+  let lastTap = 0;
+  map.on('click', e => {
+    const now = Date.now();
+    if (now - lastTap < 380) openAdd(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
+    lastTap = now;
+  });
+  map.on('contextmenu', e => openAdd(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6)));
+}
+
+function mkIcon(status) {
+  const c = SC[status] || '#8a8f9e';
+  const em = { pending: '◌', priority: '⚡', visiting: '➤', visited: '✓' }[status] || '●';
+  return L.divIcon({
+    html: `<div style="width:30px;height:30px;background:${c};border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);
+      display:flex;align-items:center;justify-content:center;">
+      <span style="transform:rotate(45deg);font-size:12px;color:white;font-weight:800;line-height:1">${em}</span>
+    </div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -32]
+  });
+}
+
+function refreshMap() {
+  Object.values(mkrs).forEach(m => map.removeLayer(m));
+  mkrs = {};
+  locs.forEach(loc => {
+    if (!loc.lat || !loc.lng) return;
+    const mk = L.marker([loc.lat, loc.lng], { icon: mkIcon(loc.status) }).addTo(map);
+    const recPart = (loc.recommendation && loc.recommendation !== 'none')
+      ? `<div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${RC[loc.recommendation]};margin-top:2px">${RL[loc.recommendation]}</div>` : '';
+    const potPart = loc.potential ? `<div class="mpop-info">⚡ ${loc.potential}</div>` : '';
+    const popPart = loc.population ? `<div class="mpop-info">👥 ~${Number(loc.population).toLocaleString()} hab.</div>` : '';
+    mk.bindPopup(`<div class="mpop">
+      <div class="mpop-name">${loc.name}</div>
+      <div class="mpop-st" style="color:${SC[loc.status]}">${SL[loc.status]}</div>
+      ${recPart}${potPart}${popPart}
+      <button class="mpop-btn" onclick="openDet('${loc.id}')">Voir détails →</button>
+    </div>`, { maxWidth: 220 });
+    mkrs[loc.id] = mk;
+  });
+  updHdr();
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function sw(v) {
+  document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(x => x.classList.remove('active'));
+  document.getElementById(v + '-view').classList.add('active');
+  document.getElementById('nav-' + v).classList.add('active');
+  if (v === 'list') renderList();
+  if (v === 'report') renderReport();
+  if (v === 'map') setTimeout(() => map && map.invalidateSize(), 80);
+}
+
+// ═══════════════════════════════════════════════
+// AJOUT / ÉDITION
+// ═══════════════════════════════════════════════
+function openAdd(lat, lng) {
+  cSt = 'pending'; cRec = 'none'; pendPh = []; editPh = [];
+  document.getElementById('eid').value = '';
+  document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
+  document.getElementById('del-btn').style.display = 'none';
+  ['fn','fpop','feco','fsite','fdist','fnotes','fsubs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('flat').value = lat || '';
+  document.getElementById('flng').value = lng || '';
+  document.getElementById('flouma').value = '';
+  document.getElementById('fmkt').value = '0';
+  document.getElementById('froad').value = '0';
+  document.getElementById('fsig').value = '';
+  document.getElementById('fpot').value = '';
+  resetTg();
+  renderPGrid([]);
+  openOv('add-ov');
+}
+
+function openEdit(id) {
+  const loc = locs.find(l => l.id === id);
+  if (!loc) return;
+  cSt = loc.status; cRec = loc.recommendation || 'none';
+  document.getElementById('eid').value = loc.id;
+  document.getElementById('add-ttl').textContent = 'Modifier Localité';
+  document.getElementById('del-btn').style.display = 'block';
+  document.getElementById('fn').value = loc.name || '';
+  document.getElementById('flat').value = loc.lat || '';
+  document.getElementById('flng').value = loc.lng || '';
+  document.getElementById('fpop').value = loc.population || '';
+  document.getElementById('flouma').value = loc.louma || '';
+  document.getElementById('fmkt').value = loc.hasMarket ? '1' : '0';
+  document.getElementById('froad').value = loc.hasRoad ? '1' : '0';
+  document.getElementById('feco').value = loc.economicActivities || '';
+  document.getElementById('fpot').value = loc.potential || '';
+  document.getElementById('fsubs').value = loc.subs || '';
+  document.getElementById('fsite').value = loc.nearestSite || '';
+  document.getElementById('fdist').value = loc.distanceToSite || '';
+  document.getElementById('fsig').value = loc.signalQuality || '';
+  document.getElementById('fnotes').value = loc.notes || '';
+  resetTg();
+  document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
+  document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
+  pendPh = []; editPh = [];
+  const n = loc.photoCount || 0;
+  for (let i = 0; i < n; i++) { const p = loadPh(loc.id, i); if (p) editPh.push(p); }
+  renderPGrid([...editPh]);
+  openOv('add-ov');
+}
+
+function resetTg() {
+  document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === 'pending'));
+  document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === 'none'));
+}
+
+function selS(el) {
+  cSt = el.dataset.s;
+  document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+function selR(el) {
+  cRec = el.dataset.r;
+  document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function renderPGrid(photos) {
+  const g = document.getElementById('pgrid'); g.innerHTML = '';
+  photos.forEach(p => {
+    const img = document.createElement('img'); img.className = 'pthumb'; img.src = p;
+    img.onclick = () => viewPh(p); g.appendChild(img);
+  });
+  if (photos.length < 3) {
+    const a = document.createElement('div'); a.className = 'padd'; a.innerHTML = '📷';
+    a.onclick = () => document.getElementById('photo-input').click(); g.appendChild(a);
+  }
+}
+
+function handlePh(e) {
+  Array.from(e.target.files).forEach(f => {
+    if (editPh.length + pendPh.length >= 3) return;
+    const r = new FileReader();
+    r.onload = ev => compress(ev.target.result, c => {
+      pendPh.push(c); renderPGrid([...editPh, ...pendPh]);
+    });
+    r.readAsDataURL(f);
+  });
+  e.target.value = '';
+}
+
+function compress(src, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    const mx = 900, my = 675; let w = img.width, h = img.height;
+    if (w > mx) { h = h * mx / w; w = mx; }
+    if (h > my) { w = w * my / h; h = my; }
+    cv.width = Math.round(w); cv.height = Math.round(h);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    cb(cv.toDataURL('image/jpeg', 0.72));
+  };
+  img.src = src;
+}
+
+function saveLoc() {
+  const name = document.getElementById('fn').value.trim();
+  if (!name) { toast('⚠️ Le nom est obligatoire'); return; }
+  const eid = document.getElementById('eid').value;
+  const isEdit = !!eid;
+  const allPh = [...editPh, ...pendPh];
+  const id = isEdit ? eid : 'loc_' + Date.now();
+
+  const data = {
+    id, name,
+    lat: parseFloat(document.getElementById('flat').value) || null,
+    lng: parseFloat(document.getElementById('flng').value) || null,
+    status: cSt, recommendation: cRec,
+    population: document.getElementById('fpop').value || null,
+    subs: document.getElementById('fsubs').value || null,
+    louma: document.getElementById('flouma').value || null,
+    hasMarket: document.getElementById('fmkt').value === '1',
+    hasRoad: document.getElementById('froad').value === '1',
+    economicActivities: document.getElementById('feco').value || null,
+    potential: document.getElementById('fpot').value || null,
+    nearestSite: document.getElementById('fsite').value || null,
+    distanceToSite: document.getElementById('fdist').value || null,
+    signalQuality: document.getElementById('fsig').value || null,
+    notes: document.getElementById('fnotes').value || null,
+    photoCount: allPh.length,
+    createdAt: isEdit ? (locs.find(l => l.id === eid)?.createdAt || Date.now()) : Date.now(),
+    updatedAt: Date.now(),
+    visitedAt: cSt === 'visited' ? (locs.find(l => l.id === eid)?.visitedAt || Date.now()) : null
+  };
+
+  allPh.forEach((p, i) => savePh(id, i, p));
+
+  if (isEdit) {
+    const idx = locs.findIndex(l => l.id === eid);
+    if (idx >= 0) locs[idx] = data;
+  } else {
+    locs.push(data);
+  }
+
+  saveData();
+  closeOv('add-ov');
+  refreshMap();
+  toast(isEdit ? '✓ Localité mise à jour' : '✓ Localité ajoutée');
+  if (document.getElementById('list-view').classList.contains('active')) renderList();
+}
+
+function askDel() {
+  const eid = document.getElementById('eid').value;
+  const loc = locs.find(l => l.id === eid);
+  document.getElementById('cd-m').textContent = `Supprimer "${loc?.name}" ? Cette action est irréversible.`;
+  document.getElementById('cdlg').classList.add('open');
+}
+function closeCd() { document.getElementById('cdlg').classList.remove('open'); }
+function doDel() {
+  const eid = document.getElementById('eid').value; if (!eid) return;
+  const loc = locs.find(l => l.id === eid);
+  delPhs(eid, loc?.photoCount || 0);
+  locs = locs.filter(l => l.id !== eid);
+  saveData();
+  closeCd();
+  closeOv('add-ov');
+  closeOv('det-ov');
+  refreshMap();
+  toast('🗑️ Localité supprimée');
+  if (document.getElementById('list-view').classList.contains('active')) renderList();
+}
+
+// ═══════════════════════════════════════════════
+// DÉTAIL
+// ═══════════════════════════════════════════════
+function openDet(id) {
+  const loc = locs.find(l => l.id === id); if (!loc) return;
+  const phs = [];
+  for (let i = 0; i < (loc.photoCount || 0); i++) { const p = loadPh(id, i); if (p) phs.push(p); }
+  const rc = loc.recommendation || 'none';
+  const reI = { optim: '📡', new_site: '🏗️', none: '✅' }[rc];
+  const sc = SC[loc.status];
+  const isV = loc.status === 'visited';
+  const potColor = { 'Très fort': '#FF6600', 'Fort': '#FF6600', 'Moyen': '#1565c0', 'Faible': '#8a8f9e' }[loc.potential] || 'var(--tx)';
+
+  document.getElementById('det-sheet').innerHTML = `
+    <div class="det-hero" style="background:${sc}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div style="flex:1">
+          <div class="det-sbadge">${SL[loc.status]}</div>
+          <div class="det-name">${loc.name}</div>
+          ${loc.lat && loc.lng ? `<div class="det-coords">📍 ${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}</div>` : ''}
+        </div>
+        <button class="mclose" style="background:rgba(255,255,255,.25);color:white;flex-shrink:0" onclick="closeOv('det-ov')">✕</button>
+      </div>
+    </div>
+    <div class="det-actions">
+      <button class="abtn ab-edit" onclick="closeOv('det-ov');openEdit('${id}')">✏️ Modifier</button>
+      <button class="abtn ${isV ? 'ab-map' : 'ab-visit'}" onclick="qVisit('${id}')">
+        ${isV ? '🗺️ Voir sur carte' : '✓ Marquer visitée'}
+      </button>
+    </div>
+    <div class="det-sec">
+      <div class="det-st">Potentiel Business</div>
+      <div class="det-grid">
+        <div class="det-item"><div class="det-il">Population</div><div class="det-iv">${loc.population ? Number(loc.population).toLocaleString() + ' hab.' : '—'}</div></div>
+        <div class="det-item"><div class="det-il">Louma hebdo</div><div class="det-iv">${loc.louma || '—'}</div></div>
+        <div class="det-item"><div class="det-il">Marché permanent</div><div class="det-iv">${loc.hasMarket ? '✅ Oui' : '❌ Non'}</div></div>
+        <div class="det-item"><div class="det-il">Axe routier</div><div class="det-iv">${loc.hasRoad ? '✅ Oui' : '❌ Non'}</div></div>
+      </div>
+      ${loc.potential ? `<div class="det-item" style="margin-top:8px"><div class="det-il">Potentiel estimé</div><div class="det-iv" style="color:${potColor}">${loc.potential}</div></div>` : ''}
+      ${loc.subs ? `<div class="det-item" style="margin-top:8px"><div class="det-il">Abonnés estimés</div><div class="det-iv">${Number(loc.subs).toLocaleString()}</div></div>` : ''}
+      ${loc.economicActivities ? `<div class="det-item" style="margin-top:8px"><div class="det-il">Activités économiques</div><div class="det-iv" style="font-size:13px;font-weight:500">${loc.economicActivities}</div></div>` : ''}
+    </div>
+    <div class="det-sec">
+      <div class="det-st">Couverture Réseau</div>
+      ${loc.nearestSite
+        ? `<div class="cov-box"><div style="font-size:26px">📡</div><div><div class="cov-site">${loc.nearestSite}</div><div class="cov-dist">${loc.distanceToSite ? loc.distanceToSite + ' km' : ''}${loc.signalQuality ? ' · Signal: ' + loc.signalQuality : ''}</div></div></div>`
+        : `<p style="font-size:12px;color:var(--tx3);font-family:'JetBrains Mono',monospace">Site non renseigné</p>`
+      }
+      <div class="rec-box ${rc}">
+        <div style="font-size:22px">${reI}</div>
+        <div>
+          <div class="rec-txt" style="color:${RC[rc]}">${RL[rc]}</div>
+          <div class="rec-sub">${
+            rc === 'optim' ? 'Tilt, puissance ou azimut à optimiser sur le site existant' :
+            rc === 'new_site' ? 'Potentiel justifiant la création d\'un nouveau site de couverture' :
+            'Aucune action réseau requise — couverture satisfaisante'
+          }</div>
+        </div>
+      </div>
+    </div>
+    ${loc.notes ? `<div class="det-sec"><div class="det-st">Notes & Observations</div><div class="det-notes">${loc.notes}</div></div>` : ''}
+    ${phs.length > 0 ? `<div class="det-sec"><div class="det-st">Photos (${phs.length})</div>
+      <div class="pgrid">${phs.map(p => `<img class="pthumb" src="${p}" onclick="viewPh('${p}')">`).join('')}</div>
+    </div>` : ''}
+    <div class="det-ts">Ajouté le ${new Date(loc.createdAt).toLocaleDateString('fr-FR')}${loc.visitedAt ? ' · Visité le ' + new Date(loc.visitedAt).toLocaleDateString('fr-FR') : ''}</div>
+    <div style="height:16px"></div>
+  `;
+  openOv('det-ov');
+  map && map.closePopup();
+}
+
+function qVisit(id) {
+  const loc = locs.find(l => l.id === id); if (!loc) return;
+  if (loc.status === 'visited') {
+    closeOv('det-ov'); sw('map');
+    if (loc.lat && loc.lng) { map.setView([loc.lat, loc.lng], 14); mkrs[id] && mkrs[id].openPopup(); }
+    return;
+  }
+  loc.status = 'visited'; loc.visitedAt = Date.now();
+  saveData(); refreshMap();
+  toast('✓ ' + loc.name + ' marquée comme visitée');
+  openDet(id);
+}
+
+// ═══════════════════════════════════════════════
+// LISTE
+// ═══════════════════════════════════════════════
+function setFilter(el) {
+  document.querySelectorAll('.fchip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active'); curFilter = el.dataset.f; renderList();
+}
+
+function renderList() {
+  const q = (document.getElementById('srch')?.value || '').toLowerCase();
+  const el = document.getElementById('llist');
+  let items = [...locs].filter(loc => {
+    const ms = !q || loc.name.toLowerCase().includes(q) ||
+      (loc.economicActivities || '').toLowerCase().includes(q) ||
+      (loc.nearestSite || '').toLowerCase().includes(q) ||
+      (loc.notes || '').toLowerCase().includes(q);
+    let mf = true;
+    if (curFilter === 'new_site') mf = loc.recommendation === 'new_site';
+    else if (curFilter === 'optim') mf = loc.recommendation === 'optim';
+    else if (curFilter !== 'all') mf = loc.status === curFilter;
+    return ms && mf;
+  }).sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
+
+  if (!items.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🗺️</div>
+      <div class="empty-t">Aucune localité</div>
+      <div class="empty-s">Ajoutez des points via le bouton + sur la carte<br>ou en double-tapant sur la carte</div></div>`;
+    return;
+  }
+  el.innerHTML = items.map(loc => {
+    const rc = loc.recommendation || 'none';
+    return `<div class="lcard" onclick="openDet('${loc.id}')">
+      <div class="lcard-top">
+        <div class="sdot" style="background:${SC[loc.status]}"></div>
+        <div class="lcard-name">${loc.name}</div>
+        ${rc !== 'none' ? `<span class="rbadge rb-${rc}">${rc === 'optim' ? 'Optim.' : 'Nv. site'}</span>` : ''}
+      </div>
+      <div class="lcard-meta">
+        ${loc.population ? `<span class="mchip">👥 ${Number(loc.population).toLocaleString()}</span>` : ''}
+        ${loc.louma ? `<span class="mchip">📅 ${loc.louma}</span>` : ''}
+        ${loc.hasMarket ? `<span class="mchip">🏪 Marché</span>` : ''}
+        ${loc.potential ? `<span class="mchip">⚡ ${loc.potential}</span>` : ''}
+        ${loc.nearestSite ? `<span class="mchip">📡 ${loc.nearestSite}${loc.distanceToSite ? ' ' + loc.distanceToSite + 'km' : ''}</span>` : ''}
+        ${loc.photoCount ? `<span class="mchip">📷 ${loc.photoCount}</span>` : ''}
+      </div>
+      ${loc.notes ? `<div class="lcard-note">${loc.notes}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// RAPPORT
+// ═══════════════════════════════════════════════
+function renderReport() {
+  const total = locs.length;
+  const vis = locs.filter(l => l.status === 'visited').length;
+  const pri = locs.filter(l => l.status === 'priority').length;
+  const pend = locs.filter(l => l.status === 'pending').length;
+  const ns = locs.filter(l => l.recommendation === 'new_site').length;
+  const op = locs.filter(l => l.recommendation === 'optim').length;
+  const wl = locs.filter(l => l.louma).length;
+  const wm = locs.filter(l => l.hasMarket).length;
+  const pct = total ? Math.round(vis / total * 100) : 0;
+  const now = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const sorted = [...locs].sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
+
+  document.getElementById('rpc').innerHTML = `
+    <div class="rp-hdr">
+      <h2>📊 Rapport de Mission</h2>
+      <p>Évaluation Potentiel Rural · ${now}</p>
+      <div class="rp-pct">${vis}/${total} localités visitées (${pct}%)</div>
+    </div>
+    <div class="sgrid">
+      <div class="scard brand"><div class="sv">${total}</div><div class="sl">Total localités</div></div>
+      <div class="scard green"><div class="sv">${vis}</div><div class="sl">Visitées</div></div>
+      <div class="scard red"><div class="sv">${pri}</div><div class="sl">Prioritaires</div></div>
+      <div class="scard"><div class="sv">${pend}</div><div class="sl">À visiter</div></div>
+    </div>
+    <div class="sec-t" style="margin-bottom:8px">Recommandations Couverture</div>
+    <div class="sgrid" style="margin-bottom:14px">
+      <div class="scard" style="border-color:#e53935"><div class="sv" style="color:#e53935">${ns}</div><div class="sl">Nouveaux sites requis</div></div>
+      <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations antennaires</div></div>
+    </div>
+    <div class="sec-t" style="margin-bottom:8px">Potentiel Économique</div>
+    <div class="sgrid" style="margin-bottom:14px">
+      <div class="scard"><div class="sv">${wm}</div><div class="sl">Avec marché permanent</div></div>
+      <div class="scard"><div class="sv">${wl}</div><div class="sl">Avec louma hebdo</div></div>
+    </div>
+    <div class="sec-t" style="margin-bottom:8px">Détail Localités</div>
+    ${sorted.map(loc => {
+      const rc = loc.recommendation || 'none';
+      return `<div class="rli">
+        <div class="rli-top">
+          <div class="sdot" style="background:${SC[loc.status]}"></div>
+          <div class="rli-name">${loc.name}</div>
+          <div class="rli-st" style="color:${SC[loc.status]}">${SL[loc.status]}</div>
+        </div>
+        <div class="rli-meta">
+          ${loc.population ? `<span>👥 ${Number(loc.population).toLocaleString()} hab.</span>` : ''}
+          ${loc.louma ? `<span>📅 Louma ${loc.louma}</span>` : ''}
+          ${loc.hasMarket ? `<span>🏪 Marché</span>` : ''}
+          ${loc.hasRoad ? `<span>🛣️ Axe routier</span>` : ''}
+          ${loc.potential ? `<span>⚡ ${loc.potential}</span>` : ''}
+          ${loc.nearestSite ? `<span>📡 ${loc.nearestSite}${loc.distanceToSite ? ' (' + loc.distanceToSite + 'km)' : ''}</span>` : ''}
+          ${loc.signalQuality ? `<span>📶 ${loc.signalQuality}</span>` : ''}
+        </div>
+        ${loc.economicActivities ? `<div class="rli-meta" style="margin-top:3px"><span>⚙️ ${loc.economicActivities}</span></div>` : ''}
+        <span class="rli-rec rb-${rc}">${rc === 'new_site' ? '🏗️ Nouveau site' : rc === 'optim' ? '📡 Optimisation' : '✅ Couverture OK'}</span>
+        ${loc.notes ? `<div class="rli-note">"${loc.notes}"</div>` : ''}
+      </div>`;
+    }).join('')}
+    <button class="exp-btn" onclick="exportHTML()">📥 Exporter rapport HTML</button>
+    <button class="exp-btn sec" onclick="exportCSV()">📊 Exporter CSV</button>
+    <div style="height:20px"></div>
+  `;
+}
+
+function exportHTML() {
+  const total = locs.length, vis = locs.filter(l => l.status === 'visited').length;
+  const pct = total ? Math.round(vis / total * 100) : 0;
+  const now = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const ns = locs.filter(l => l.recommendation === 'new_site').length;
+  const op = locs.filter(l => l.recommendation === 'optim').length;
+  const sorted = [...locs].sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
+
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>GeoMission — Rapport ${now}</title>
+<style>
+body{font-family:Arial,sans-serif;margin:32px;color:#0d0f14;font-size:13px;}
+h1{color:#FF6600;font-size:22px;margin-bottom:4px;}
+.sub{font-size:12px;color:#666;margin-bottom:20px;}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.stat{background:#f7f8fa;border:1px solid #e2e4e9;border-radius:8px;padding:10px 16px;text-align:center;}
+.stat strong{display:block;font-size:24px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#FF6600;color:white;padding:7px 8px;text-align:left;}
+td{padding:6px 8px;border-bottom:1px solid #e2e4e9;vertical-align:top;}
+tr:nth-child(even) td{background:#f7f8fa;}
+.b{padding:2px 5px;border-radius:3px;font-size:11px;font-weight:700;}
+.bv{background:#e8f5e9;color:#2e7d32;}.bp{background:#fdecea;color:#e53935;}
+.bi{background:#fff3eb;color:#FF6600;}.bn{background:#f0f1f3;color:#666;}
+.bop{background:#e3f0fb;color:#1565c0;}.bns{background:#fdecea;color:#e53935;}.bok{background:#e8f5e9;color:#2e7d32;}
+@media print{body{margin:16px;}.stats{flex-wrap:wrap;}}
+</style></head><body>
+<h1>📊 Rapport GeoMission — Évaluation Potentiel Rural</h1>
+<div class="sub">Orange Sonatel · ${now} · ${vis}/${total} visitées (${pct}%) · Généré le ${new Date().toLocaleString('fr-FR')}</div>
+<div class="stats">
+  <div class="stat"><strong>${total}</strong>Total</div>
+  <div class="stat"><strong style="color:#2e7d32">${vis}</strong>Visitées</div>
+  <div class="stat"><strong style="color:#e53935">${locs.filter(l => l.status === 'priority').length}</strong>Prioritaires</div>
+  <div class="stat"><strong style="color:#e53935">${ns}</strong>Nouveaux sites</div>
+  <div class="stat"><strong style="color:#1565c0">${op}</strong>Optimisations</div>
+  <div class="stat"><strong>${locs.filter(l => l.hasMarket).length}</strong>Avec marché</div>
+  <div class="stat"><strong>${locs.filter(l => l.louma).length}</strong>Avec louma</div>
+</div>
+<table>
+<tr><th>Localité</th><th>Statut</th><th>Population</th><th>Louma</th><th>Marché</th><th>Potentiel</th><th>Activités</th><th>Site proche</th><th>Dist (km)</th><th>Signal</th><th>Préconisation</th><th>Notes</th></tr>
+${sorted.map(l => `<tr>
+  <td><strong>${l.name}</strong></td>
+  <td><span class="b ${l.status === 'visited' ? 'bv' : l.status === 'priority' ? 'bp' : l.status === 'visiting' ? 'bi' : 'bn'}">${SL[l.status]}</span></td>
+  <td>${l.population ? Number(l.population).toLocaleString() : '—'}</td>
+  <td>${l.louma || '—'}</td>
+  <td>${l.hasMarket ? '✅' : '❌'}</td>
+  <td>${l.potential || '—'}</td>
+  <td>${l.economicActivities || '—'}</td>
+  <td>${l.nearestSite || '—'}</td>
+  <td>${l.distanceToSite || '—'}</td>
+  <td>${l.signalQuality || '—'}</td>
+  <td><span class="b ${(l.recommendation || 'none') === 'new_site' ? 'bns' : (l.recommendation || 'none') === 'optim' ? 'bop' : 'bok'}">${RL[l.recommendation || 'none']}</span></td>
+  <td style="font-style:italic;color:#555">${l.notes || ''}</td>
+</tr>`).join('')}
+</table>
+<p style="margin-top:24px;font-size:11px;color:#999">Généré par GeoMission · Orange Sonatel · ${new Date().toLocaleString('fr-FR')}</p>
+</body></html>`;
+  dlBlob(html, `rapport_geomission_${Date.now()}.html`, 'text/html;charset=utf-8');
+  toast('✓ Rapport HTML exporté');
+}
+
+function exportCSV() {
+  const sorted = [...locs].sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
+  const h = ['Localité','Statut','Latitude','Longitude','Population','Louma','Marché','Axe routier',
+    'Potentiel','Activités économiques','Site proche','Distance km','Signal','Préconisation','Notes',
+    'Date visite','Latitude_Dd','Longitude_Dd'];
+  const rows = sorted.map(l => [
+    l.name, SL[l.status], l.lat || '', l.lng || '', l.population || '', l.louma || '',
+    l.hasMarket ? 'Oui' : 'Non', l.hasRoad ? 'Oui' : 'Non',
+    l.potential || '', l.economicActivities || '', l.nearestSite || '',
+    l.distanceToSite || '', l.signalQuality || '', RL[l.recommendation || 'none'],
+    (l.notes || '').replace(/"/g, '""'), l.visitedAt ? new Date(l.visitedAt).toLocaleDateString('fr-FR') : '',
+    l.lat || '', l.lng || ''
+  ].map(v => `"${v}"`).join(','));
+  const csv = '\uFEFF' + [h.join(','), ...rows].join('\n');
+  dlBlob(csv, `geomission_${Date.now()}.csv`, 'text/csv;charset=utf-8');
+  toast('✓ CSV exporté');
+}
+
+function dlBlob(content, name, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════
+// GPS
+// ═══════════════════════════════════════════════
+function captureGPS() {
+  if (!navigator.geolocation) { toast('⚠️ GPS non disponible'); return; }
+  toast('📍 Localisation en cours…');
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      document.getElementById('flat').value = p.coords.latitude.toFixed(6);
+      document.getElementById('flng').value = p.coords.longitude.toFixed(6);
+      toast('✓ Position capturée');
+    },
+    () => toast('⚠️ Impossible de localiser'),
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function goMyLoc() {
+  if (!navigator.geolocation) { toast('⚠️ GPS non disponible'); return; }
+  navigator.geolocation.getCurrentPosition(
+    p => { map.setView([p.coords.latitude, p.coords.longitude], 13); toast('✓ Position trouvée'); },
+    () => toast('⚠️ GPS indisponible')
+  );
+}
+
+// ═══════════════════════════════════════════════
+// UTILITAIRES UI
+// ═══════════════════════════════════════════════
+function openOv(id) { document.getElementById(id).classList.add('open'); }
+function closeOv(id) { document.getElementById(id).classList.remove('open'); }
+function viewPh(src) { document.getElementById('pv-img').src = src; document.getElementById('pv').classList.add('open'); }
+function closePV() { document.getElementById('pv').classList.remove('open'); }
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(tmToast);
+  tmToast = setTimeout(() => t.classList.remove('show'), 2700);
+}
+
+function updHdr() {
+  document.getElementById('ct-t').textContent = locs.length;
+  document.getElementById('ct-v').textContent = locs.filter(l => l.status === 'visited').length;
+  document.getElementById('ct-p').textContent = locs.filter(l => l.status === 'priority').length;
+  const pending = locs.filter(l => l.status === 'pending' || l.status === 'priority').length;
+  document.getElementById('hdr-sub').textContent =
+    locs.length === 0 ? 'Évaluation Potentiel Rural' :
+    `${locs.filter(l => l.status === 'visited').length}/${locs.length} visitées · ${pending} restantes`;
+}
+
+// ═══════════════════════════════════════════════
+// IMPORT EXCEL / CSV
+// ═══════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+// IMPORT EXCEL / CSV — VERSION MOBILE-ROBUSTE
+// ════════════════════════════════════════════════════════════
+
+const COL_ALIASES = {
+  name:               ['nom','name','localite','localite_nom','village','lieu','point','designation','libelle','quartier','hameau'],
+  lat:                ['lat','latitude','lati','latt','y','coord_y','lat_dd','latitude_dd','coordy','gps_lat','geo_lat'],
+  lng:                ['lng','lon','long','longitude','x','coord_x','lon_dd','longitude_dd','coordx','long_dd','gps_lon','gps_lng','geo_lng'],
+  population:         ['population','pop','habitants','hab','nb_hab','nb_habitants','popul','population_totale'],
+  louma:              ['louma','jour_louma','jour_marche','marche_hebdo','louma_jour','hebdomadaire','foire'],
+  hasMarket:          ['marche','marche_permanent','has_market','market','marche_fixe','marche_jour'],
+  hasRoad:            ['route','axe','axe_routier','has_road','road','axe_route','voie','bitume','goudron'],
+  economicActivities: ['activites','activities','economie','economic_activities','activite_eco','secteur','secteur_activite'],
+  potential:          ['potentiel','potential','niveau_potentiel','pot','niveau','score_potentiel'],
+  subs:               ['abonnes','subs','subscribers','nb_abonnes','clients','nb_clients','abonnes_estime'],
+  nearestSite:        ['site','site_proche','nearest_site','site_couverture','site_ran','nom_site','site_bts','bts','cellule'],
+  distanceToSite:     ['distance','dist','distance_km','dist_km','distance_site','km','dist_site'],
+  signalQuality:      ['signal','qualite_signal','signal_quality','qualite','niveau_signal','rssi','force_signal'],
+  recommendation:     ['preconisation','recommendation','rec','recommandation','action','action_reseau'],
+  notes:              ['notes','observations','obs','remarques','commentaires','note','info','description'],
+  status:             ['statut','status','etat','etat_visite','visite','visitee']
+};
+
+const FIELD_LABELS = {
+  name:'Nom *', lat:'Latitude *', lng:'Longitude *',
+  population:'Population', louma:'Louma', hasMarket:'Marché',
+  hasRoad:'Axe routier', economicActivities:'Activités éco.',
+  potential:'Potentiel', subs:'Abonnés estimés',
+  nearestSite:'Site RAN proche', distanceToSite:'Distance (km)',
+  signalQuality:'Signal', recommendation:'Préconisation',
+  notes:'Notes', status:'Statut'
+};
+
+const REQUIRED_FIELDS = ['name','lat','lng'];
+
+// État de l'import
+let impData        = [];  // toutes les lignes de données (index = col original du fichier)
+let impAllHeaders  = [];  // tous les en-têtes, index = colonne d'origine dans le fichier ← CLÉ DU CORRECTIF
+let impMapping     = {};  // { field: originalColIndex } — toujours référence la colonne ORIGINALE
+let impMode        = 'add';
+let impPendingRows = [];
+
+// ─── Nettoyage d'en-tête ultra-robuste ───────────────────
+// Élimine tous les caractères invisibles que les navigateurs mobiles
+// peuvent injecter : BOM, NBSP, espaces insécables, zero-width, contrôles…
+function cleanHeader(raw) {
+  return String(raw == null ? '' : raw)
+    // BOM et caractères de contrôle / invisibles / zero-width
+    .replace(/[\u0000-\u001F\u007F-\u009F\u00AD\u00A0\u200B-\u200F\u2028\u2029\uFEFF]/g, '')
+    .trim();
+}
+
+// Normalise pour comparaison : minuscule, sans accents, ponctuation → _
+function normCol(s) {
+  return cleanHeader(s)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // supprime les diacritiques
+    .replace(/[\s\-_./\\()\[\]{}:;,|@#]+/g, '_')        // tout séparateur → _
+    .replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+// ─── Détection automatique colonnes → champs ─────────────
+// Reçoit impAllHeaders (tableau brut, index = colonne originale)
+// Retourne { field: originalIndex }
+function detectMapping(allHeaders) {
+  const mapping = {};
+  const normH = allHeaders.map(normCol);
+
+  Object.entries(COL_ALIASES).forEach(([field, aliases]) => {
+    let found = -1;
+    // 1. Correspondance exacte
+    for (const alias of aliases) {
+      const idx = normH.findIndex(h => h === alias);
+      if (idx !== -1) { found = idx; break; }
+    }
+    // 2. L'alias est contenu dans l'en-tête (ex: "nb_hab" dans "nb_habitants_2023")
+    if (found === -1) {
+      for (const alias of aliases) {
+        if (alias.length < 3) continue; // évite les faux positifs sur "x","y"
+        const idx = normH.findIndex(h => h.includes(alias));
+        if (idx !== -1) { found = idx; break; }
+      }
+    }
+    // 3. L'en-tête est contenu dans l'alias (ex: "lat" contenu dans "latitude")
+    if (found === -1) {
+      for (const alias of aliases) {
+        if (alias.length < 3) continue;
+        const idx = normH.findIndex(h => h.length >= 3 && alias.includes(h));
+        if (idx !== -1) { found = idx; break; }
+      }
+    }
+    mapping[field] = found;
+  });
+  return mapping;
+}
+
+// ─── Conversions valeurs ─────────────────────────────────
+function mapStatus(v) {
+  const s = normCol(v || '');
+  if (s.includes('visit') || s.includes('fait') || s.includes('done') || s.includes('termine')) return 'visited';
+  if (s.includes('prior') || s.includes('urgent') || s.includes('important')) return 'priority';
+  if (s.includes('cours') || s.includes('progress') || s.includes('encours')) return 'visiting';
+  return 'pending';
+}
+function mapRec(v) {
+  const s = normCol(v || '');
+  if (s.includes('nouveau') || s.includes('new') || s.includes('creer') || s.includes('construire')) return 'new_site';
+  if (s.includes('optim') || s.includes('antenn') || s.includes('tilt') || s.includes('azimut') || s.includes('amelior')) return 'optim';
+  return 'none';
+}
+function mapBool(v) {
+  if (v === null || v === undefined || v === '') return false;
+  const s = String(v).toLowerCase().trim();
+  return ['oui','yes','1','true','x','✓','✅','vrai','ok'].includes(s);
+}
+
+// ─── Lecture fichier ─────────────────────────────────────
+function isCSVType(file) {
+  // Vérification double : extension ET type MIME (important sur mobile)
+  return /\.csv$/i.test(file.name) ||
+    file.type === 'text/csv' ||
+    file.type === 'text/plain' ||
+    file.type === 'application/csv';
+}
+
+function parseFile(file) {
+  const reader = new FileReader();
+
+  reader.onerror = () => toast('⚠️ Impossible de lire le fichier');
+
+  reader.onload = e => {
+    try {
+      let rawRows = [];
+
+      if (isCSVType(file)) {
+        rawRows = parseCSV(e.target.result);
+      } else {
+        // XLSX / XLS — { raw: false } force les valeurs en string formaté
+        const wb = XLSX.read(new Uint8Array(e.target.result), {
+          type: 'array', raw: false, cellText: true
+        });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(ws, {
+          header: 1, defval: '', raw: false, blankrows: false
+        });
+      }
+
+      if (!rawRows.length || rawRows.length < 2) {
+        toast('⚠️ Fichier vide ou première ligne manquante'); return;
+      }
+
+      // ── CORRECTIF CLÉ : impAllHeaders conserve TOUS les index originaux ──
+      // On ne filtre PAS le tableau — l'index i dans impAllHeaders
+      // correspond toujours à la colonne i dans les lignes de données.
+      impAllHeaders = rawRows[0].map(cleanHeader);
+
+      // Lignes de données : on ignore les lignes entièrement vides
+      impData = rawRows.slice(1).filter(r =>
+        r.some(c => c !== null && c !== undefined && String(c).trim() !== '')
+      );
+
+      if (!impData.length) { toast('⚠️ Aucune ligne de données trouvée'); return; }
+
+      impMapping = detectMapping(impAllHeaders);
+      showStep2();
+
+    } catch(err) {
+      toast('⚠️ Erreur de lecture : ' + err.message);
+      console.error('[GeoMission Import]', err);
+    }
+  };
+
+  // Lecture : texte pour CSV, ArrayBuffer pour tout le reste
+  if (isCSVType(file)) reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+// Parser CSV robuste : gère guillemets, séparateurs multiples, encodages
+function parseCSV(text) {
+  text = text.replace(/^\uFEFF/, ''); // retire BOM UTF-8
+  // Détecte le séparateur sur la première ligne
+  const firstLine = text.split(/\r?\n/)[0];
+  const semiCount = (firstLine.match(/;/g) || []).length;
+  const tabCount  = (firstLine.match(/\t/g) || []).length;
+  const comCount  = (firstLine.match(/,/g) || []).length;
+  const sep = tabCount >= semiCount && tabCount >= comCount ? '\t'
+            : semiCount >= comCount ? ';' : ',';
+
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const row = [];
+    let inQ = false, cur = '', i = 0;
+    while (i < line.length) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i += 2; }
+        else { inQ = !inQ; i++; }
+      } else if (c === sep && !inQ) {
+        row.push(cleanHeader(cur)); cur = ''; i++;
+      } else { cur += c; i++; }
+    }
+    row.push(cleanHeader(cur));
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ─── Affichage étape 2 ───────────────────────────────────
+function showStep2() {
+  document.getElementById('imp-step1').classList.remove('active');
+  document.getElementById('imp-step2').classList.add('active');
+  document.getElementById('imp-ttl').textContent = 'Vérifier & Importer';
+  recomputeValidRows();
+  renderColMapping();
+  renderPreview();
+}
+
+function recomputeValidRows() {
+  const latIdx = impMapping['lat'];
+  const lngIdx = impMapping['lng'];
+  impPendingRows = impData.filter(r => {
+    if (latIdx < 0 || lngIdx < 0) return true;
+    const lat = parseFloat(String(r[latIdx] || '').replace(',','.'));
+    const lng = parseFloat(String(r[lngIdx] || '').replace(',','.'));
+    return !isNaN(lat) && !isNaN(lng);
+  });
+  document.getElementById('imp-row-count').textContent = impPendingRows.length;
+  document.getElementById('imp-btn-n').textContent = impPendingRows.length;
+}
+
+// ─── Rendu mapping colonnes ──────────────────────────────
+function renderColMapping() {
+  const grid = document.getElementById('col-map-grid');
+  const allFields = Object.keys(FIELD_LABELS);
+
+  // Options du select : seules les colonnes NON-VIDES, avec leur index ORIGINAL comme valeur
+  const colOptions = impAllHeaders
+    .map((h, i) => h ? `<option value="${i}">${h}</option>` : '')
+    .join('');
+  const noneOpt = `<option value="-1">— Non mappé —</option>`;
+
+  grid.innerHTML = allFields.map(field => {
+    const idx = impMapping[field];
+    const isReq = REQUIRED_FIELDS.includes(field);
+    const ok = idx >= 0;
+    const badge = ok ? '✅' : (isReq ? '❌' : '⚪');
+    return `<div class="col-row">
+      <span class="col-status">${badge}</span>
+      <span class="col-field">${FIELD_LABELS[field]}</span>
+      <select class="col-select" id="colsel_${field}" onchange="onColChange('${field}',this.value)">
+        ${noneOpt}${colOptions}
+      </select>
+    </div>`;
+  }).join('');
+
+  // Pré-sélectionner les valeurs détectées
+  allFields.forEach(field => {
+    const sel = document.getElementById(`colsel_${field}`);
+    if (sel) sel.value = String(impMapping[field] >= 0 ? impMapping[field] : -1);
+  });
+}
+
+function onColChange(field, value) {
+  impMapping[field] = parseInt(value);
+  recomputeValidRows();
+  renderPreview();
+  // Mettre à jour le badge du row
+  const badge = impMapping[field] >= 0 ? '✅' : (REQUIRED_FIELDS.includes(field) ? '❌' : '⚪');
+  const row = document.getElementById(`colsel_${field}`)?.closest('.col-row');
+  if (row) row.querySelector('.col-status').textContent = badge;
+}
+
+// ─── Prévisualisation ────────────────────────────────────
+function renderPreview() {
+  const table = document.getElementById('prev-table');
+  const showFields = ['name','lat','lng','population','louma','hasMarket','potential','nearestSite']
+    .filter(f => impMapping[f] >= 0);
+  if (!showFields.length) { table.innerHTML = ''; return; }
+
+  const thead = `<thead><tr>${showFields.map(f =>
+    `<th>${FIELD_LABELS[f].replace(' *','')}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${impPendingRows.slice(0,5).map(r =>
+    `<tr>${showFields.map(f => {
+      const idx = impMapping[f];
+      const val = (idx >= 0 && idx < r.length) ? String(r[idx] ?? '') : '';
+      return `<td>${val}</td>`;
+    }).join('')}</tr>`
+  ).join('')}</tbody>`;
+  table.innerHTML = thead + tbody;
+}
+
+// ─── Conversion ligne → objet localité ──────────────────
+function rowToLoc(row) {
+  // Lit une valeur brute depuis la colonne originale
+  const g = field => {
+    const idx = impMapping[field];
+    return (idx >= 0 && idx < row.length) ? row[idx] : null;
+  };
+  // Valeur string propre (null si vide)
+  const gStr = f => {
+    const v = g(f);
+    const s = String(v ?? '').trim();
+    return s !== '' ? s : null;
+  };
+  // Valeur numérique — accepte virgule décimale (convention française)
+  const gNum = f => {
+    const v = g(f);
+    const n = parseFloat(String(v ?? '').replace(',','.'));
+    return isNaN(n) ? null : n;
+  };
+
+  return {
+    id: 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name: gStr('name') || 'Localité sans nom',
+    lat: gNum('lat'),
+    lng: gNum('lng'),
+    status: gStr('status') ? mapStatus(gStr('status')) : 'pending',
+    recommendation: gStr('recommendation') ? mapRec(gStr('recommendation')) : 'none',
+    population: gStr('population'),
+    subs: gStr('subs'),
+    louma: gStr('louma'),
+    hasMarket: g('hasMarket') !== null ? mapBool(g('hasMarket')) : false,
+    hasRoad: g('hasRoad') !== null ? mapBool(g('hasRoad')) : false,
+    economicActivities: gStr('economicActivities'),
+    potential: gStr('potential'),
+    nearestSite: gStr('nearestSite'),
+    distanceToSite: gStr('distanceToSite'),
+    signalQuality: gStr('signalQuality'),
+    notes: gStr('notes'),
+    photoCount: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    visitedAt: null
+  };
+}
+
+// ─── Exécution import ────────────────────────────────────
+function doImport() {
+  if (!impPendingRows.length) { toast('⚠️ Aucune ligne valide'); return; }
+  if (impMapping['name'] < 0) { toast('⚠️ Colonne "Nom" non mappée — utilisez les menus déroulants'); return; }
+  if (impMapping['lat'] < 0 || impMapping['lng'] < 0) {
+    toast('⚠️ Colonnes Latitude et Longitude requises'); return;
+  }
+  if (impMode === 'replace' && locs.length > 0) {
+    document.getElementById('ic-existing').textContent = locs.length;
+    document.getElementById('ic-new').textContent = impPendingRows.length;
+    document.getElementById('imp-cdlg').classList.add('open');
+  } else {
+    executeImport(false);
+  }
+}
+
+function confirmReplace() {
+  document.getElementById('imp-cdlg').classList.remove('open');
+  executeImport(true);
+}
+
+function executeImport(replace) {
+  if (replace) { locs.forEach(l => delPhs(l.id, l.photoCount || 0)); locs = []; }
+  const newLocs = impPendingRows.map(rowToLoc);
+  locs = [...locs, ...newLocs];
+  saveData();
+  closeImp();
+  refreshMap();
+  const withCoords = newLocs.filter(l => l.lat && l.lng);
+  if (withCoords.length && map) {
+    try {
+      const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
+      map.fitBounds(bounds, { padding: [40, 40] });
+    } catch(e) {}
+  }
+  toast(`✓ ${newLocs.length} localités importées${replace ? ' (remplacement)' : ''}`);
+  if (document.getElementById('list-view').classList.contains('active')) renderList();
+}
+
+// ─── Mode import ─────────────────────────────────────────
+function setImpMode(mode) {
+  impMode = mode;
+  document.getElementById('mode-add').classList.toggle('active', mode === 'add');
+  document.getElementById('mode-replace').classList.toggle('active', mode === 'replace');
+  document.getElementById('imp-warn-rep').style.display = mode === 'replace' ? 'block' : 'none';
+}
+
+// ─── Handlers fichier ────────────────────────────────────
+function handleImpFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('imp-dropzone').querySelector('.imp-zone-t').textContent = '⏳ Lecture en cours…';
+  parseFile(f);
+  e.target.value = '';
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('imp-dropzone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) parseFile(f);
+  else toast('⚠️ Aucun fichier détecté');
+}
+
+// ─── Cycle de vie modal ──────────────────────────────────
+function openImport() { resetImp(); openOv('imp-ov'); }
+function closeImp()   { closeOv('imp-ov'); setTimeout(resetImp, 400); }
+function resetImp() {
+  impData = []; impAllHeaders = []; impMapping = {}; impPendingRows = [];
+  impMode = 'add';
+  document.getElementById('imp-step1').classList.add('active');
+  document.getElementById('imp-step2').classList.remove('active');
+  document.getElementById('imp-ttl').textContent = 'Importer des localités';
+  document.getElementById('imp-dropzone').querySelector('.imp-zone-t').textContent = 'Glisser-déposer ou cliquer';
+  document.getElementById('mode-add').classList.add('active');
+  document.getElementById('mode-replace').classList.remove('active');
+  document.getElementById('imp-warn-rep').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════
+// PWA — INSTALL
+// ═══════════════════════════════════════════════
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+document.getElementById('btn-install').addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  const { outcome } = await deferredInstall.userChoice;
+  if (outcome === 'accepted') toast('✓ Application installée !');
+  document.getElementById('install-banner').classList.remove('show');
+  deferredInstall = null;
+});
+
+document.getElementById('btn-dismiss').addEventListener('click', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+  toast('✓ GeoMission installée sur votre écran d\'accueil');
+});
+
+// ═══════════════════════════════════════════════
+// OFFLINE
+// ═══════════════════════════════════════════════
+window.addEventListener('online', () => {
+  document.getElementById('offline-bar').classList.remove('show');
+  toast('🌐 Connexion rétablie');
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offline-bar').classList.add('show');
+});
+if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
+
+// ═══════════════════════════════════════════════
+// SERVICE WORKER
+// ═══════════════════════════════════════════════
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('./sw.js').then(() => {
+    console.log('GeoMission SW enregistré');
+  }).catch(e => console.warn('SW non enregistré:', e));
+}
+
+// ═══════════════════════════════════════════════
+// INITIALISATION
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  initMap();
+  refreshMap();
+  updHdr();
+
+  // URL hash routing
+  const hash = location.hash.replace('#', '');
+  if (hash === 'report') sw('report');
+  else if (hash === 'list') sw('list');
+  else if (hash === 'add') setTimeout(() => openAdd(), 300);
+
+  // Masquer splash
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    splash.classList.add('out');
+    setTimeout(() => splash.style.display = 'none', 400);
+  }, 900);
+});
+</script>
+</body>
+</html>
