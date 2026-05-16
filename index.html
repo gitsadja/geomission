@@ -1407,10 +1407,11 @@ function detectMapping(allHeaders) {
 // ─── Conversions valeurs ─────────────────────────────────
 function mapStatus(v) {
   const s = normCol(v || '');
-  if (s.includes('visit') || s.includes('fait') || s.includes('done') || s.includes('termine')) return 'visited';
+  // IMPORTANT : tester 'visitee' AVANT 'visit' — sinon "a_visiter" matche 'visit' par erreur
+  if (s.includes('visitee') || s === 'visited' || s.includes('fait') || s.includes('done') || s.includes('termine')) return 'visited';
   if (s.includes('prior') || s.includes('urgent') || s.includes('important')) return 'priority';
-  if (s.includes('cours') || s.includes('progress') || s.includes('encours')) return 'visiting';
-  return 'pending';
+  if (s.includes('cours') || s.includes('progress') || s.includes('encours') || s === 'visiting') return 'visiting';
+  return 'pending'; // "a_visiter", "pending" et toute valeur inconnue → À visiter
 }
 function mapRec(v) {
   const s = normCol(v || '');
