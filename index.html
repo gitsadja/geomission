@@ -19,6 +19,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <!-- SheetJS pour import Excel/CSV -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- JSZip pour export/import ZIP photos -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
@@ -634,6 +636,35 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
  </div>
 </div>
 
+<!-- MODAL RESTAURATION ZIP -->
+<div class="ov" id="zip-ov" onclick="if(event.target===this)closeOv('zip-ov')">
+ <div class="msheet">
+  <div class="mhandle"></div>
+  <div class="mhdr">
+    <div class="mtitle">Restaurer depuis ZIP</div>
+    <button class="mclose" onclick="closeOv('zip-ov')">✕</button>
+  </div>
+  <div class="mbody">
+    <div class="imp-zone" id="zip-dropzone"
+      onclick="document.getElementById('zip-file-input').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleZipDrop(event)">
+      <div class="imp-zone-icon">📦</div>
+      <div class="imp-zone-t" id="zip-zone-t">Glisser-déposer ou cliquer</div>
+      <div class="imp-zone-s">Sélectionner votre fichier de sauvegarde</div>
+      <div class="imp-zone-formats">
+        <span class="fmt-chip">📦 .zip (GeoMission)</span>
+      </div>
+    </div>
+    <input type="file" id="zip-file-input" accept=".zip" onchange="handleZipFile(event)">
+    <div class="warn-box">
+      ⚠️ La restauration <strong>remplacera toutes les données actuelles</strong> (localités + photos) par le contenu du ZIP.
+    </div>
+  </div>
+ </div>
+</div>
+
 <!-- CONFIRM IMPORT REPLACE -->
 <div class="cdlg" id="imp-cdlg">
   <div class="cdbox">
@@ -1164,6 +1195,8 @@ function renderReport() {
     }).join('')}
     <button class="exp-btn" onclick="exportHTML()">📥 Exporter rapport HTML</button>
     <button class="exp-btn sec" onclick="exportCSV()">📊 Exporter CSV</button>
+    <button class="exp-btn" style="background:#1565c0" onclick="exportZIP()">🗜️ Sauvegarde complète (ZIP + photos)</button>
+    <button class="exp-btn sec" onclick="openZipImport()">📦 Restaurer depuis ZIP</button>
     <div style="height:20px"></div>
   `;
 }
@@ -1255,7 +1288,169 @@ function dlBlob(content, name, type) {
 }
 
 // ═══════════════════════════════════════════════
-// GPS
+// SAUVEGARDE ZIP (données + photos)
+// ═══════════════════════════════════════════════
+
+async function exportZIP() {
+  if (!locs.length) { toast('⚠️ Aucune localité à sauvegarder'); return; }
+  toast('⏳ Création du ZIP en cours…');
+
+  try {
+    const zip = new JSZip();
+    const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+    // ── 1. Données JSON (source de vérité pour la restauration) ──
+    zip.file('geomission_data.json', JSON.stringify(locs, null, 2));
+
+    // ── 2. CSV lisible ──
+    const ord = {priority:0,pending:1,visiting:2,visited:3};
+    const sorted = [...locs].sort((a,b) => (ord[a.status]||0)-(ord[b.status]||0));
+    const hdr = ['Nom','Statut','Latitude','Longitude','Population','Louma','Marché',
+      'Axe routier','Potentiel','Activités économiques','Site proche','Distance km',
+      'Signal','Préconisation','Notes','Date visite'];
+    const rows = sorted.map(l => [
+      l.name, SL[l.status], l.lat||'', l.lng||'', l.population||'', l.louma||'',
+      l.hasMarket?'Oui':'Non', l.hasRoad?'Oui':'Non', l.potential||'',
+      l.economicActivities||'', l.nearestSite||'', l.distanceToSite||'',
+      l.signalQuality||'', RL[l.recommendation||'none'],
+      (l.notes||'').replace(/"/g,'""'),
+      l.visitedAt ? new Date(l.visitedAt).toLocaleDateString('fr-FR') : ''
+    ].map(v=>`"${v}"`).join(','));
+    zip.file('rapport.csv', '\uFEFF' + [hdr.join(','), ...rows].join('\n'));
+
+    // ── 3. Photos ──
+    const photoFolder = zip.folder('photos');
+    let photoCount = 0;
+    for (const loc of locs) {
+      const n = loc.photoCount || 0;
+      for (let i = 0; i < n; i++) {
+        const b64 = loadPh(loc.id, i);
+        if (!b64) continue;
+        // Extraire la partie base64 pure (sans le préfixe data:image/jpeg;base64,)
+        const match = b64.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const ext = match[1].split('/')[1] || 'jpg';
+        const data = match[2];
+        const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
+        photoFolder.file(`${safeName}_${i+1}.${ext}`, data, { base64: true });
+        photoCount++;
+      }
+    }
+
+    // ── 4. Manifeste (pour vérification à l'import) ──
+    zip.file('manifest.json', JSON.stringify({
+      version: 2,
+      app: 'GeoMission',
+      exportDate: new Date().toISOString(),
+      locCount: locs.length,
+      photoCount
+    }, null, 2));
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `geomission_backup_${date}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`✓ ZIP exporté — ${locs.length} localités, ${photoCount} photos`);
+
+  } catch(e) {
+    toast('⚠️ Erreur ZIP : ' + e.message);
+    console.error('[GeoMission ZIP Export]', e);
+  }
+}
+
+// ── IMPORT ZIP ───────────────────────────────────────────
+
+function openZipImport() { openOv('zip-ov'); }
+
+function handleZipFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('zip-zone-t').textContent = '⏳ Lecture en cours…';
+  restoreFromZip(f);
+  e.target.value = '';
+}
+
+function handleZipDrop(e) {
+  e.preventDefault();
+  document.getElementById('zip-dropzone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) restoreFromZip(f);
+}
+
+async function restoreFromZip(file) {
+  try {
+    toast('⏳ Restauration en cours…');
+    const ab = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(ab);
+
+    // ── Vérifier que c'est bien un ZIP GeoMission ──
+    const manifestFile = zip.file('manifest.json');
+    if (!manifestFile) {
+      toast('⚠️ Ce ZIP ne semble pas être une sauvegarde GeoMission');
+      document.getElementById('zip-zone-t').textContent = 'Glisser-déposer ou cliquer';
+      return;
+    }
+    const mf = JSON.parse(await manifestFile.async('string'));
+    if (mf.app !== 'GeoMission') {
+      toast('⚠️ Fichier ZIP non reconnu');
+      return;
+    }
+
+    // ── Charger les données JSON ──
+    const dataFile = zip.file('geomission_data.json');
+    if (!dataFile) { toast('⚠️ Données introuvables dans le ZIP'); return; }
+    const newLocs = JSON.parse(await dataFile.async('string'));
+
+    // ── Supprimer les anciennes données ──
+    locs.forEach(l => delPhs(l.id, l.photoCount || 0));
+    locs = [];
+
+    // ── Restaurer les photos ──
+    let photoRestored = 0;
+    const photoFolder = zip.folder('photos');
+
+    for (const loc of newLocs) {
+      const n = loc.photoCount || 0;
+      for (let i = 0; i < n; i++) {
+        const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
+        // Cherche jpg ou png
+        let photoFile = photoFolder.file(`${safeName}_${i+1}.jpg`) ||
+                        photoFolder.file(`${safeName}_${i+1}.jpeg`) ||
+                        photoFolder.file(`${safeName}_${i+1}.png`);
+        if (!photoFile) continue;
+        const b64data = await photoFile.async('base64');
+        const ext = photoFile.name.endsWith('.png') ? 'png' : 'jpeg';
+        savePh(loc.id, i, `data:image/${ext};base64,${b64data}`);
+        photoRestored++;
+      }
+    }
+
+    // ── Sauvegarder les localités ──
+    locs = newLocs;
+    saveData();
+    closeOv('zip-ov');
+    refreshMap();
+
+    // Zoom sur les localités
+    const withCoords = locs.filter(l => l.lat && l.lng);
+    if (withCoords.length && map) {
+      try {
+        map.fitBounds(L.latLngBounds(withCoords.map(l => [l.lat, l.lng])), { padding: [40,40] });
+      } catch(e) {}
+    }
+
+    document.getElementById('zip-zone-t').textContent = 'Glisser-déposer ou cliquer';
+    toast(`✓ Restauré — ${locs.length} localités, ${photoRestored} photos`);
+    if (document.getElementById('list-view').classList.contains('active')) renderList();
+
+  } catch(e) {
+    toast('⚠️ Erreur de restauration : ' + e.message);
+    document.getElementById('zip-zone-t').textContent = 'Glisser-déposer ou cliquer';
+    console.error('[GeoMission ZIP Import]', e);
+  }
+}
 // ═══════════════════════════════════════════════
 function captureGPS() {
   if (!navigator.geolocation) { toast('⚠️ GPS non disponible'); return; }
