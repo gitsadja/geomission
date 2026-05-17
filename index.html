@@ -130,6 +130,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .rbadge{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:4px;font-weight:600;flex-shrink:0;}
 .rb-optim{background:#e3f0fb;color:var(--ro);}
 .rb-new_site{background:#fdecea;color:var(--rn);}
+.rb-serenguetti{background:#f3e5f5;color:#7b1fa2;}
 .rb-none{background:#e8f5e9;color:var(--rok);}
 .lcard-meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px;margin-left:17px;}
 .mchip{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);}
@@ -169,6 +170,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .rtg .tr-none.active{background:var(--rok);border-color:var(--rok);}
 .rtg .tr-optim.active{background:var(--ro);border-color:var(--ro);}
 .rtg .tr-new_site.active{background:var(--rn);border-color:var(--rn);}
+.rtg .tr-serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;}
 .gps-row{display:flex;gap:7px;}
 .gps-row .fi{flex:1;}
 .gbtn{padding:9px 13px;background:var(--brand);color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;flex-shrink:0;transition:background .12s;}
@@ -210,7 +212,9 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .rec-box{border-radius:8px;padding:11px;display:flex;align-items:flex-start;gap:9px;margin-top:8px;}
 .rec-box.optim{background:#e3f0fb;}
 .rec-box.new_site{background:#fdecea;}
+.rec-box.serenguetti{background:#f3e5f5;}
 .rec-box.none{background:#e8f5e9;}
+.rs-serenguetti{color:#7b1fa2;}
 .rec-txt{font-size:13px;font-weight:700;}
 .rec-sub{font-size:12px;color:var(--tx2);margin-top:2px;line-height:1.4;}
 .det-notes{font-size:13px;line-height:1.6;}
@@ -404,6 +408,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div class="fchip" data-f="visiting" onclick="setFilter(this)">En cours</div>
         <div class="fchip" data-f="visited" onclick="setFilter(this)">Visitées</div>
         <div class="fchip" data-f="new_site" onclick="setFilter(this)">Nouveau site</div>
+        <div class="fchip" data-f="serenguetti" onclick="setFilter(this)">Sérénguetti</div>
         <div class="fchip" data-f="optim" onclick="setFilter(this)">Optim.</div>
       </div>
     </div>
@@ -533,7 +538,16 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div class="tgrp rtg">
         <div class="tbtn tr-none active" data-r="none" onclick="selR(this)">✅ OK</div>
         <div class="tbtn tr-optim" data-r="optim" onclick="selR(this)">📡 Optimisation</div>
+        <div class="tbtn tr-serenguetti" data-r="serenguetti" onclick="selR(this)">📶 Sérénguetti</div>
         <div class="tbtn tr-new_site" data-r="new_site" onclick="selR(this)">🏗️ Nouveau site</div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Date de visite</label>
+      <input type="date" class="fi" id="fvisitdate">
+      <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">
+        Remplie automatiquement au passage en "Visitée ✓"
       </div>
     </div>
 
@@ -704,8 +718,8 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 // ═══════════════════════════════════════════════
 const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓'};
 const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32'};
-const RL = {none:'Couverture OK',optim:'Optimisation antennaire',new_site:'Nouveau site requis'};
-const RC = {none:'#2e7d32',optim:'#1565c0',new_site:'#e53935'};
+const RL = {none:'Couverture OK',optim:'Optimisation antennaire',serenguetti:'Site Sérénguetti',new_site:'Nouveau site requis'};
+const RC = {none:'#2e7d32',optim:'#1565c0',serenguetti:'#7b1fa2',new_site:'#e53935'};
 const SORT_ORD = {priority:0,pending:1,visiting:2,visited:3};
 
 // ═══════════════════════════════════════════════
@@ -841,6 +855,7 @@ function openAdd(lat, lng) {
   document.getElementById('froad').value = '0';
   document.getElementById('fsig').value = '';
   document.getElementById('fpot').value = '';
+  document.getElementById('fvisitdate').value = '';
   resetTg();
   renderPGrid([]);
   openOv('add-ov');
@@ -867,6 +882,9 @@ function openEdit(id) {
   document.getElementById('fdist').value = loc.distanceToSite || '';
   document.getElementById('fsig').value = loc.signalQuality || '';
   document.getElementById('fnotes').value = loc.notes || '';
+  // Date de visite — convertit timestamp en format YYYY-MM-DD pour l'input date
+  document.getElementById('fvisitdate').value = loc.visitedAt
+    ? new Date(loc.visitedAt).toISOString().slice(0, 10) : '';
   resetTg();
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
@@ -886,6 +904,11 @@ function selS(el) {
   cSt = el.dataset.s;
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  // Auto-remplir la date de visite quand on passe à "Visitée"
+  const dateField = document.getElementById('fvisitdate');
+  if (cSt === 'visited' && dateField && !dateField.value) {
+    dateField.value = new Date().toISOString().slice(0, 10);
+  }
 }
 function selR(el) {
   cRec = el.dataset.r;
@@ -958,7 +981,12 @@ function saveLoc() {
     photoCount: allPh.length,
     createdAt: isEdit ? (locs.find(l => l.id === eid)?.createdAt || Date.now()) : Date.now(),
     updatedAt: Date.now(),
-    visitedAt: cSt === 'visited' ? (locs.find(l => l.id === eid)?.visitedAt || Date.now()) : null
+    visitedAt: (() => {
+      const dv = document.getElementById('fvisitdate').value;
+      if (dv) return new Date(dv).getTime();                         // date saisie manuellement
+      if (cSt === 'visited') return locs.find(l=>l.id===eid)?.visitedAt || Date.now(); // déjà visitée
+      return null;
+    })()
   };
 
   allPh.forEach((p, i) => savePh(id, i, p));
@@ -1006,7 +1034,7 @@ function openDet(id) {
   const phs = [];
   for (let i = 0; i < (loc.photoCount || 0); i++) { const p = loadPh(id, i); if (p) phs.push(p); }
   const rc = loc.recommendation || 'none';
-  const reI = { optim: '📡', new_site: '🏗️', none: '✅' }[rc];
+  const reI = { optim: '📡', new_site: '🏗️', serenguetti: '📶', none: '✅' }[rc];
   const sc = SC[loc.status];
   const isV = loc.status === 'visited';
   const potColor = { 'Très fort': '#FF6600', 'Fort': '#FF6600', 'Moyen': '#1565c0', 'Faible': '#8a8f9e' }[loc.potential] || 'var(--tx)';
@@ -1052,6 +1080,7 @@ function openDet(id) {
           <div class="rec-txt" style="color:${RC[rc]}">${RL[rc]}</div>
           <div class="rec-sub">${
             rc === 'optim' ? 'Tilt, puissance ou azimut à optimiser sur le site existant' :
+            rc === 'serenguetti' ? 'Potentiel moyen — déploiement d\'un site Sérénguetti (couverture et capacité réduites)' :
             rc === 'new_site' ? 'Potentiel justifiant la création d\'un nouveau site de couverture' :
             'Aucune action réseau requise — couverture satisfaisante'
           }</div>
@@ -1100,6 +1129,7 @@ function renderList() {
       (loc.notes || '').toLowerCase().includes(q);
     let mf = true;
     if (curFilter === 'new_site') mf = loc.recommendation === 'new_site';
+    else if (curFilter === 'serenguetti') mf = loc.recommendation === 'serenguetti';
     else if (curFilter === 'optim') mf = loc.recommendation === 'optim';
     else if (curFilter !== 'all') mf = loc.status === curFilter;
     return ms && mf;
@@ -1117,7 +1147,7 @@ function renderList() {
       <div class="lcard-top">
         <div class="sdot" style="background:${SC[loc.status]}"></div>
         <div class="lcard-name">${loc.name}</div>
-        ${rc !== 'none' ? `<span class="rbadge rb-${rc}">${rc === 'optim' ? 'Optim.' : 'Nv. site'}</span>` : ''}
+        ${rc !== 'none' ? `<span class="rbadge rb-${rc}">${rc === 'optim' ? 'Optim.' : rc === 'serenguetti' ? 'Sérénguetti' : 'Nv. site'}</span>` : ''}
       </div>
       <div class="lcard-meta">
         ${loc.population ? `<span class="mchip">👥 ${Number(loc.population).toLocaleString()}</span>` : ''}
@@ -1141,6 +1171,7 @@ function renderReport() {
   const pri = locs.filter(l => l.status === 'priority').length;
   const pend = locs.filter(l => l.status === 'pending').length;
   const ns = locs.filter(l => l.recommendation === 'new_site').length;
+  const sr = locs.filter(l => l.recommendation === 'serenguetti').length;
   const op = locs.filter(l => l.recommendation === 'optim').length;
   const wl = locs.filter(l => l.louma).length;
   const wm = locs.filter(l => l.hasMarket).length;
@@ -1161,9 +1192,13 @@ function renderReport() {
       <div class="scard"><div class="sv">${pend}</div><div class="sl">À visiter</div></div>
     </div>
     <div class="sec-t" style="margin-bottom:8px">Recommandations Couverture</div>
-    <div class="sgrid" style="margin-bottom:14px">
+    <div class="sgrid" style="margin-bottom:6px">
       <div class="scard" style="border-color:#e53935"><div class="sv" style="color:#e53935">${ns}</div><div class="sl">Nouveaux sites requis</div></div>
+      <div class="scard" style="border-color:#7b1fa2"><div class="sv" style="color:#7b1fa2">${sr}</div><div class="sl">Sites Sérénguetti</div></div>
+    </div>
+    <div class="sgrid" style="margin-bottom:14px">
       <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations antennaires</div></div>
+      <div class="scard green"><div class="sv">${locs.filter(l=>!l.recommendation||l.recommendation==='none').length}</div><div class="sl">Couverture OK</div></div>
     </div>
     <div class="sec-t" style="margin-bottom:8px">Potentiel Économique</div>
     <div class="sgrid" style="margin-bottom:14px">
@@ -1173,6 +1208,7 @@ function renderReport() {
     <div class="sec-t" style="margin-bottom:8px">Détail Localités</div>
     ${sorted.map(loc => {
       const rc = loc.recommendation || 'none';
+      const recLabel = rc === 'new_site' ? '🏗️ Nouveau site' : rc === 'serenguetti' ? '📶 Sérénguetti' : rc === 'optim' ? '📡 Optimisation' : '✅ Couverture OK';
       return `<div class="rli">
         <div class="rli-top">
           <div class="sdot" style="background:${SC[loc.status]}"></div>
@@ -1187,9 +1223,10 @@ function renderReport() {
           ${loc.potential ? `<span>⚡ ${loc.potential}</span>` : ''}
           ${loc.nearestSite ? `<span>📡 ${loc.nearestSite}${loc.distanceToSite ? ' (' + loc.distanceToSite + 'km)' : ''}</span>` : ''}
           ${loc.signalQuality ? `<span>📶 ${loc.signalQuality}</span>` : ''}
+          ${loc.visitedAt ? `<span>🗓️ ${new Date(loc.visitedAt).toLocaleDateString('fr-FR')}</span>` : ''}
         </div>
         ${loc.economicActivities ? `<div class="rli-meta" style="margin-top:3px"><span>⚙️ ${loc.economicActivities}</span></div>` : ''}
-        <span class="rli-rec rb-${rc}">${rc === 'new_site' ? '🏗️ Nouveau site' : rc === 'optim' ? '📡 Optimisation' : '✅ Couverture OK'}</span>
+        <span class="rli-rec rb-${rc}">${recLabel}</span>
         ${loc.notes ? `<div class="rli-note">"${loc.notes}"</div>` : ''}
       </div>`;
     }).join('')}
@@ -1225,7 +1262,7 @@ tr:nth-child(even) td{background:#f7f8fa;}
 .b{padding:2px 5px;border-radius:3px;font-size:11px;font-weight:700;}
 .bv{background:#e8f5e9;color:#2e7d32;}.bp{background:#fdecea;color:#e53935;}
 .bi{background:#fff3eb;color:#FF6600;}.bn{background:#f0f1f3;color:#666;}
-.bop{background:#e3f0fb;color:#1565c0;}.bns{background:#fdecea;color:#e53935;}.bok{background:#e8f5e9;color:#2e7d32;}
+.bop{background:#e3f0fb;color:#1565c0;}.bns{background:#fdecea;color:#e53935;}.bsr{background:#f3e5f5;color:#7b1fa2;}.bok{background:#e8f5e9;color:#2e7d32;}
 @media print{body{margin:16px;}.stats{flex-wrap:wrap;}}
 </style></head><body>
 <h1>📊 Rapport GeoMission — Évaluation Potentiel Rural</h1>
@@ -1252,7 +1289,7 @@ ${sorted.map(l => `<tr>
   <td>${l.nearestSite || '—'}</td>
   <td>${l.distanceToSite || '—'}</td>
   <td>${l.signalQuality || '—'}</td>
-  <td><span class="b ${(l.recommendation || 'none') === 'new_site' ? 'bns' : (l.recommendation || 'none') === 'optim' ? 'bop' : 'bok'}">${RL[l.recommendation || 'none']}</span></td>
+  <td><span class="b ${(l.recommendation||'none') === 'new_site' ? 'bns' : (l.recommendation||'none') === 'serenguetti' ? 'bsr' : (l.recommendation||'none') === 'optim' ? 'bop' : 'bok'}">${RL[l.recommendation||'none']}</span></td>
   <td style="font-style:italic;color:#555">${l.notes || ''}</td>
 </tr>`).join('')}
 </table>
@@ -1611,6 +1648,7 @@ function mapStatus(v) {
 function mapRec(v) {
   const s = normCol(v || '');
   if (s.includes('nouveau') || s.includes('new') || s.includes('creer') || s.includes('construire')) return 'new_site';
+  if (s.includes('serenguetti') || s.includes('serengueti') || s.includes('serengetti')) return 'serenguetti';
   if (s.includes('optim') || s.includes('antenn') || s.includes('tilt') || s.includes('azimut') || s.includes('amelior')) return 'optim';
   return 'none';
 }
