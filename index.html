@@ -184,6 +184,26 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .btn-save:active{background:var(--brand-dk);}
 .btn-del{width:100%;padding:11px;background:white;color:#e53935;border:1.5px solid #e53935;border-radius:var(--r);
   font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:7px;}
+/* HORS PLANNING */
+.extra-toggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+  border:1.5px solid var(--brd);background:var(--bg2);cursor:pointer;transition:all .15s;margin-bottom:12px;}
+.extra-toggle.on{background:#fff8e1;border-color:#f59e0b;}
+.extra-toggle-icon{font-size:20px;flex-shrink:0;}
+.extra-toggle-txt{flex:1;}
+.extra-toggle-lbl{font-size:13px;font-weight:700;color:var(--tx);}
+.extra-toggle-sub{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
+.extra-switch{width:38px;height:22px;background:var(--brd);border-radius:11px;position:relative;
+  transition:background .15s;flex-shrink:0;}
+.extra-switch::after{content:'';position:absolute;width:16px;height:16px;background:white;border-radius:50%;
+  top:3px;left:3px;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.extra-toggle.on .extra-switch{background:#f59e0b;}
+.extra-toggle.on .extra-switch::after{transform:translateX(16px);}
+/* Badge hors planning */
+.hp-badge{background:#fff8e1;color:#92400e;border:1px solid #f59e0b;border-radius:4px;
+  font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 6px;font-weight:700;}
+.hp-marker{position:absolute;top:-4px;right:-4px;background:#f59e0b;color:white;
+  border-radius:50%;width:14px;height:14px;font-size:9px;display:flex;align-items:center;
+  justify-content:center;font-weight:800;border:1.5px solid white;}
 #photo-input{display:none;}
 
 /* DETAIL */
@@ -407,6 +427,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div class="fchip" data-f="priority" onclick="setFilter(this)">Prioritaires</div>
         <div class="fchip" data-f="visiting" onclick="setFilter(this)">En cours</div>
         <div class="fchip" data-f="visited" onclick="setFilter(this)">Visitées</div>
+        <div class="fchip" data-f="extra" onclick="setFilter(this)">⭐ Hors planning</div>
         <div class="fchip" data-f="new_site" onclick="setFilter(this)">Nouveau site</div>
         <div class="fchip" data-f="serenguetti" onclick="setFilter(this)">Sérénguetti</div>
         <div class="fchip" data-f="optim" onclick="setFilter(this)">Optim.</div>
@@ -549,6 +570,15 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">
         Remplie automatiquement au passage en "Visitée ✓"
       </div>
+    </div>
+
+    <div class="extra-toggle" id="extra-toggle" onclick="toggleExtra()">
+      <div class="extra-toggle-icon">⭐</div>
+      <div class="extra-toggle-txt">
+        <div class="extra-toggle-lbl">Localité hors planning</div>
+        <div class="extra-toggle-sub">Découverte sur le terrain, non planifiée initialement</div>
+      </div>
+      <div class="extra-switch"></div>
     </div>
 
     <div class="fg">
@@ -731,6 +761,7 @@ let mkrs = {};
 let curFilter = 'all';
 let cSt = 'pending';
 let cRec = 'none';
+let cExtra = false;
 let pendPh = [];
 let editPh = [];
 let tmToast = null;
@@ -792,14 +823,17 @@ function initMap() {
   map.on('contextmenu', e => openAdd(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6)));
 }
 
-function mkIcon(status) {
+function mkIcon(status, isExtra) {
   const c = SC[status] || '#8a8f9e';
   const em = { pending: '◌', priority: '⚡', visiting: '➤', visited: '✓' }[status] || '●';
+  const star = isExtra ? `<div style="position:absolute;top:-5px;right:-5px;background:#f59e0b;color:white;border-radius:50%;width:14px;height:14px;font-size:9px;display:flex;align-items:center;justify-content:center;border:1.5px solid white;font-weight:800;">★</div>` : '';
   return L.divIcon({
-    html: `<div style="width:30px;height:30px;background:${c};border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);
-      display:flex;align-items:center;justify-content:center;">
-      <span style="transform:rotate(45deg);font-size:12px;color:white;font-weight:800;line-height:1">${em}</span>
+    html: `<div style="position:relative;width:30px;height:30px;">
+      <div style="width:30px;height:30px;background:${c};border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);
+        display:flex;align-items:center;justify-content:center;">
+        <span style="transform:rotate(45deg);font-size:12px;color:white;font-weight:800;line-height:1">${em}</span>
+      </div>${star}
     </div>`,
     className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -32]
   });
@@ -810,7 +844,7 @@ function refreshMap() {
   mkrs = {};
   locs.forEach(loc => {
     if (!loc.lat || !loc.lng) return;
-    const mk = L.marker([loc.lat, loc.lng], { icon: mkIcon(loc.status) }).addTo(map);
+    const mk = L.marker([loc.lat, loc.lng], { icon: mkIcon(loc.status, loc.isExtra) }).addTo(map);
     const recPart = (loc.recommendation && loc.recommendation !== 'none')
       ? `<div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${RC[loc.recommendation]};margin-top:2px">${RL[loc.recommendation]}</div>` : '';
     const potPart = loc.potential ? `<div class="mpop-info">⚡ ${loc.potential}</div>` : '';
@@ -843,7 +877,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'none'; pendPh = []; editPh = [];
+  cSt = 'pending'; cRec = 'none'; pendPh = []; editPh = []; cExtra = false;
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -856,6 +890,7 @@ function openAdd(lat, lng) {
   document.getElementById('fsig').value = '';
   document.getElementById('fpot').value = '';
   document.getElementById('fvisitdate').value = '';
+  document.getElementById('extra-toggle').classList.remove('on');
   resetTg();
   renderPGrid([]);
   openOv('add-ov');
@@ -885,6 +920,8 @@ function openEdit(id) {
   // Date de visite — convertit timestamp en format YYYY-MM-DD pour l'input date
   document.getElementById('fvisitdate').value = loc.visitedAt
     ? new Date(loc.visitedAt).toISOString().slice(0, 10) : '';
+  cExtra = !!loc.isExtra;
+  document.getElementById('extra-toggle').classList.toggle('on', cExtra);
   resetTg();
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
@@ -914,6 +951,10 @@ function selR(el) {
   cRec = el.dataset.r;
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+}
+function toggleExtra() {
+  cExtra = !cExtra;
+  document.getElementById('extra-toggle').classList.toggle('on', cExtra);
 }
 
 function renderPGrid(photos) {
@@ -978,6 +1019,7 @@ function saveLoc() {
     distanceToSite: document.getElementById('fdist').value || null,
     signalQuality: document.getElementById('fsig').value || null,
     notes: document.getElementById('fnotes').value || null,
+    isExtra: cExtra,
     photoCount: allPh.length,
     createdAt: isEdit ? (locs.find(l => l.id === eid)?.createdAt || Date.now()) : Date.now(),
     updatedAt: Date.now(),
@@ -1044,6 +1086,7 @@ function openDet(id) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between">
         <div style="flex:1">
           <div class="det-sbadge">${SL[loc.status]}</div>
+          ${loc.isExtra ? `<div style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,.3);border-radius:20px;padding:3px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;color:white;margin-bottom:4px;">⭐ Hors planning</div>` : ''}
           <div class="det-name">${loc.name}</div>
           ${loc.lat && loc.lng ? `<div class="det-coords">📍 ${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}</div>` : ''}
         </div>
@@ -1128,7 +1171,8 @@ function renderList() {
       (loc.nearestSite || '').toLowerCase().includes(q) ||
       (loc.notes || '').toLowerCase().includes(q);
     let mf = true;
-    if (curFilter === 'new_site') mf = loc.recommendation === 'new_site';
+    if (curFilter === 'extra') mf = !!loc.isExtra;
+    else if (curFilter === 'new_site') mf = loc.recommendation === 'new_site';
     else if (curFilter === 'serenguetti') mf = loc.recommendation === 'serenguetti';
     else if (curFilter === 'optim') mf = loc.recommendation === 'optim';
     else if (curFilter !== 'all') mf = loc.status === curFilter;
@@ -1147,6 +1191,7 @@ function renderList() {
       <div class="lcard-top">
         <div class="sdot" style="background:${SC[loc.status]}"></div>
         <div class="lcard-name">${loc.name}</div>
+        ${loc.isExtra ? `<span class="hp-badge">⭐ Hors planning</span>` : ''}
         ${rc !== 'none' ? `<span class="rbadge rb-${rc}">${rc === 'optim' ? 'Optim.' : rc === 'serenguetti' ? 'Sérénguetti' : 'Nv. site'}</span>` : ''}
       </div>
       <div class="lcard-meta">
@@ -1168,6 +1213,7 @@ function renderList() {
 function renderReport() {
   const total = locs.length;
   const vis = locs.filter(l => l.status === 'visited').length;
+  const extra = locs.filter(l => l.isExtra).length;
   const pri = locs.filter(l => l.status === 'priority').length;
   const pend = locs.filter(l => l.status === 'pending').length;
   const ns = locs.filter(l => l.recommendation === 'new_site').length;
@@ -1183,7 +1229,7 @@ function renderReport() {
     <div class="rp-hdr">
       <h2>📊 Rapport de Mission</h2>
       <p>Évaluation Potentiel Rural · ${now}</p>
-      <div class="rp-pct">${vis}/${total} localités visitées (${pct}%)</div>
+      <div class="rp-pct">${vis}/${total} localités visitées (${pct}%)${extra ? ` · dont <strong>${extra} hors planning ⭐</strong>` : ''}</div>
     </div>
     <div class="sgrid">
       <div class="scard brand"><div class="sv">${total}</div><div class="sl">Total localités</div></div>
@@ -1212,7 +1258,7 @@ function renderReport() {
       return `<div class="rli">
         <div class="rli-top">
           <div class="sdot" style="background:${SC[loc.status]}"></div>
-          <div class="rli-name">${loc.name}</div>
+          <div class="rli-name">${loc.name}${loc.isExtra ? ' <span class="hp-badge">⭐</span>' : ''}</div>
           <div class="rli-st" style="color:${SC[loc.status]}">${SL[loc.status]}</div>
         </div>
         <div class="rli-meta">
