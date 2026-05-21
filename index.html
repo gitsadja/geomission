@@ -323,7 +323,49 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* MAP PICKER */
+/* MAP FILTER BAR */
+.map-filter-bar{position:absolute;bottom:calc(76px + var(--safe-b));left:0;right:0;
+  z-index:400;padding:0 10px 8px;pointer-events:none;}
+.map-filter-scroll{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:4px 2px;pointer-events:all;}
+.map-filter-scroll::-webkit-scrollbar{display:none;}
+.mfchip{padding:5px 11px;border-radius:20px;font-size:11px;font-family:'JetBrains Mono',monospace;
+  border:none;background:rgba(255,255,255,.92);color:var(--tx2);cursor:pointer;
+  white-space:nowrap;flex-shrink:0;box-shadow:0 1px 6px rgba(0,0,0,.18);
+  transition:all .15s;font-weight:600;}
+.mfchip.active{color:white;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.mfchip[data-mf="all"].active{background:var(--brand);}
+.mfchip[data-mf="pending"].active{background:#8a8f9e;}
+.mfchip[data-mf="priority"].active{background:#e53935;}
+.mfchip[data-mf="visiting"].active{background:#FF6600;}
+.mfchip[data-mf="visited"].active{background:#2e7d32;}
+.mfchip[data-mf="introuvable"].active{background:#4a4f5c;}
+.mfchip[data-mf="extra"].active{background:#f59e0b;}
+.mfchip[data-mf="ok_macro"].active{background:#e53935;}
+.mfchip[data-mf="ok_serenguetti"].active{background:#7b1fa2;}
+.mfchip[data-mf="ok_voisin"].active{background:#0277bd;}
+.mfchip[data-mf="nok_optim"].active{background:#1565c0;}
+.map-search-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:400;width:calc(100% - 120px);max-width:340px;}
+.map-search-input{width:100%;padding:9px 14px 9px 36px;border-radius:25px;border:none;
+  box-shadow:var(--sh2);font-family:'Syne',sans-serif;font-size:13px;outline:none;
+  background:white;color:var(--tx);}
+.map-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  font-size:15px;pointer-events:none;}
+.map-search-clear{position:absolute;right:11px;top:50%;transform:translateY(-50%);
+  background:none;border:none;font-size:14px;cursor:pointer;color:var(--tx3);
+  padding:2px;display:none;}
+.map-search-results{position:absolute;top:calc(100% + 5px);left:0;right:0;
+  background:white;border-radius:12px;box-shadow:var(--sh2);
+  max-height:220px;overflow-y:auto;display:none;}
+.map-search-results.open{display:block;}
+.msr-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--brd);
+  display:flex;align-items:center;gap:8px;transition:background .1s;}
+.msr-item:last-child{border-bottom:none;}
+.msr-item:active{background:var(--brand-lt);}
+.msr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.msr-name{font-size:13px;font-weight:700;flex:1;}
+.msr-meta{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--tx3);}
+.msr-empty{padding:12px 14px;font-size:12px;color:var(--tx3);font-family:'JetBrains Mono',monospace;text-align:center;}
 .map-picker-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:none;align-items:flex-end;}
 .map-picker-modal.open{display:flex;}
 .map-picker-sheet{background:white;border-radius:20px 20px 0 0;width:100%;height:75dvh;display:flex;flex-direction:column;}
@@ -448,6 +490,19 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   <!-- CARTE -->
   <div id="map-view" class="view active">
     <div id="map"></div>
+    <!-- BARRE DE RECHERCHE CARTE -->
+    <div class="map-search-bar" id="map-search-bar">
+      <div style="position:relative;">
+        <span class="map-search-icon">🔍</span>
+        <input type="text" class="map-search-input" id="map-srch"
+          placeholder="Rechercher une localité…"
+          oninput="onMapSearch(this.value)"
+          onfocus="onMapSearch(this.value)"
+          autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="map-search-clear" id="map-srch-clear" onclick="clearMapSearch()">✕</button>
+      </div>
+      <div class="map-search-results" id="map-srch-results"></div>
+    </div>
     <div class="map-legend">
       <div class="leg-row"><div class="leg-dot" style="background:#8a8f9e"></div>À visiter</div>
       <div class="leg-row"><div class="leg-dot" style="background:#e53935"></div>Prioritaire</div>
@@ -456,6 +511,23 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
     </div>
     <button class="fab-gps" onclick="goMyLoc()" title="Ma position">🎯</button>
     <button class="fab" onclick="openAdd()" title="Ajouter">+</button>
+
+    <!-- FILTRES CARTE -->
+    <div class="map-filter-bar">
+      <div class="map-filter-scroll">
+        <button class="mfchip active" data-mf="all"          onclick="setMapFilter(this)">Toutes</button>
+        <button class="mfchip"        data-mf="pending"       onclick="setMapFilter(this)">À visiter</button>
+        <button class="mfchip"        data-mf="priority"      onclick="setMapFilter(this)">⚡ Prioritaires</button>
+        <button class="mfchip"        data-mf="visiting"      onclick="setMapFilter(this)">En cours</button>
+        <button class="mfchip"        data-mf="visited"       onclick="setMapFilter(this)">✓ Visitées</button>
+        <button class="mfchip"        data-mf="introuvable"   onclick="setMapFilter(this)">✗ Introuvable</button>
+        <button class="mfchip"        data-mf="extra"         onclick="setMapFilter(this)">⭐ Hors planning</button>
+        <button class="mfchip"        data-mf="ok_macro"      onclick="setMapFilter(this)">🏗️ Site Macro</button>
+        <button class="mfchip"        data-mf="ok_serenguetti" onclick="setMapFilter(this)">📶 Sérénguetti</button>
+        <button class="mfchip"        data-mf="ok_voisin"     onclick="setMapFilter(this)">🔗 Site voisin</button>
+        <button class="mfchip"        data-mf="nok_optim"     onclick="setMapFilter(this)">📡 Optim.</button>
+      </div>
+    </div>
   </div>
 
   <!-- LISTE -->
@@ -1121,14 +1193,43 @@ function mkIcon(status, isExtra) {
   });
 }
 
+let curMapFilter = 'all';
+
+function setMapFilter(el) {
+  document.querySelectorAll('.mfchip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  curMapFilter = el.dataset.mf;
+  refreshMap();
+}
+
+function locMatchesMapFilter(loc) {
+  const rc = migrateRec(loc.recommendation, loc.status);
+  switch(curMapFilter) {
+    case 'all':          return true;
+    case 'pending':      return loc.status === 'pending';
+    case 'priority':     return loc.status === 'priority';
+    case 'visiting':     return loc.status === 'visiting';
+    case 'visited':      return loc.status === 'visited';
+    case 'introuvable':  return loc.status === 'introuvable';
+    case 'extra':        return !!loc.isExtra;
+    case 'ok_macro':     return rc === 'ok_macro';
+    case 'ok_serenguetti': return rc === 'ok_serenguetti';
+    case 'ok_voisin':    return rc === 'ok_voisin';
+    case 'nok_optim':    return rc === 'nok_optim';
+    default:             return true;
+  }
+}
+
 function refreshMap() {
   Object.values(mkrs).forEach(m => map.removeLayer(m));
   mkrs = {};
   locs.forEach(loc => {
     if (!loc.lat || !loc.lng) return;
+    if (!locMatchesMapFilter(loc)) return; // ← filtre actif
+    const rc = migrateRec(loc.recommendation, loc.status);
     const mk = L.marker([loc.lat, loc.lng], { icon: mkIcon(loc.status, loc.isExtra) }).addTo(map);
-    const recPart = (loc.recommendation && loc.recommendation !== 'none')
-      ? `<div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${RC[loc.recommendation]};margin-top:2px">${RL[loc.recommendation]}</div>` : '';
+    const recPart = rc && rc !== 'non_evalue'
+      ? `<div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${RC[rc]||'#555'};margin-top:2px">${RL[rc]||rc}</div>` : '';
     const potPart = loc.potential ? `<div class="mpop-info">⚡ ${loc.potential}</div>` : '';
     const popPart = loc.population ? `<div class="mpop-info">👥 ~${Number(loc.population).toLocaleString()} hab.</div>` : '';
     mk.bindPopup(`<div class="mpop">
@@ -2520,7 +2621,72 @@ window.addEventListener('offline', () => {
 if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
 
 // ═══════════════════════════════════════════════
-// MAP PICKER — sélection localité cible sur carte
+// RECHERCHE SUR LA CARTE
+// ═══════════════════════════════════════════════
+function onMapSearch(q) {
+  const clear = document.getElementById('map-srch-clear');
+  const res   = document.getElementById('map-srch-results');
+  clear.style.display = q ? 'block' : 'none';
+
+  if (!q.trim()) { res.classList.remove('open'); return; }
+
+  const norm = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const matches = locs.filter(l =>
+    l.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(norm) ||
+    (l.nearestSite||'').toLowerCase().includes(norm) ||
+    (l.economicActivities||'').toLowerCase().includes(norm)
+  ).slice(0, 8);
+
+  if (!matches.length) {
+    res.innerHTML = `<div class="msr-empty">Aucun résultat pour "${q}"</div>`;
+    res.classList.add('open');
+    return;
+  }
+
+  res.innerHTML = matches.map(loc => {
+    const rc = migrateRec(loc.recommendation, loc.status);
+    const meta = [
+      loc.population ? `👥 ${Number(loc.population).toLocaleString()}` : '',
+      loc.potential  ? `⚡ ${loc.potential}` : '',
+      !loc.lat || !loc.lng ? '📵 Sans coords' : ''
+    ].filter(Boolean).join(' · ');
+    return `<div class="msr-item" onclick="goToLoc('${loc.id}')">
+      <div class="msr-dot" style="background:${SC[loc.status]}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="msr-name">${loc.name}</div>
+        ${meta ? `<div class="msr-meta">${meta}</div>` : ''}
+      </div>
+      <div class="msr-meta">${SL[loc.status]}</div>
+    </div>`;
+  }).join('');
+  res.classList.add('open');
+}
+
+function goToLoc(id) {
+  const loc = locs.find(l => l.id === id); if (!loc) return;
+  clearMapSearch();
+  if (loc.lat && loc.lng) {
+    map.setView([loc.lat, loc.lng], 15);
+    setTimeout(() => { if (mkrs[id]) mkrs[id].openPopup(); }, 300);
+  } else {
+    // Pas de coords → ouvrir directement la fiche
+    openDet(id);
+  }
+}
+
+function clearMapSearch() {
+  document.getElementById('map-srch').value = '';
+  document.getElementById('map-srch-clear').style.display = 'none';
+  document.getElementById('map-srch-results').classList.remove('open');
+}
+
+// Fermer résultats si on clique ailleurs sur la carte
+document.addEventListener('click', e => {
+  const bar = document.getElementById('map-search-bar');
+  if (bar && !bar.contains(e.target)) {
+    document.getElementById('map-srch-results')?.classList.remove('open');
+  }
+});
 // ═══════════════════════════════════════════════
 let pickerMap = null;
 let pickerMarker = null;
