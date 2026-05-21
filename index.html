@@ -768,8 +768,12 @@ let tmToast = null;
 let deferredInstall = null;
 
 // ═══════════════════════════════════════════════
-// STORAGE — localStorage
+// STORAGE
+// • Données texte  → localStorage (léger, sync)
+// • Photos         → IndexedDB    (pas de limite dure)
 // ═══════════════════════════════════════════════
+
+// ── Données texte ────────────────────────────────
 function loadData() {
   try {
     const raw = localStorage.getItem('gm_locs');
@@ -779,21 +783,87 @@ function loadData() {
 
 function saveData() {
   try { localStorage.setItem('gm_locs', JSON.stringify(locs)); }
-  catch(e) { toast('⚠️ Stockage plein, vérifiez les photos'); }
+  catch(e) { toast('⚠️ Erreur sauvegarde données'); }
 }
 
-function savePh(id, i, b64) {
-  try { localStorage.setItem(`gm_ph_${id}_${i}`, b64); }
-  catch(e) { console.warn('Photo storage error', e); }
+// ── IndexedDB pour les photos ────────────────────
+let _idb = null; // instance de la base, ouverte une seule fois
+
+function openIDB() {
+  if (_idb) return Promise.resolve(_idb);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('GeoMissionPhotos', 1);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore('photos');
+    };
+    req.onsuccess = e => { _idb = e.target.result; resolve(_idb); };
+    req.onerror   = e => reject(e.target.error);
+  });
 }
 
-function loadPh(id, i) {
-  return localStorage.getItem(`gm_ph_${id}_${i}`);
+function idbTx(mode) {
+  return openIDB().then(db => ({
+    store: db.transaction('photos', mode).objectStore('photos')
+  }));
 }
 
-function delPhs(id, n) {
-  for (let i = 0; i < n; i++)
-    localStorage.removeItem(`gm_ph_${id}_${i}`);
+function idbReq(req) {
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res(req.result);
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+async function savePh(id, i, b64) {
+  try {
+    const { store } = await idbTx('readwrite');
+    await idbReq(store.put(b64, `${id}_${i}`));
+  } catch(e) { console.warn('savePh error', e); toast('⚠️ Erreur sauvegarde photo'); }
+}
+
+async function loadPh(id, i) {
+  try {
+    const { store } = await idbTx('readonly');
+    return await idbReq(store.get(`${id}_${i}`)) || null;
+  } catch(e) { return null; }
+}
+
+async function delPhs(id, n) {
+  try {
+    const { store } = await idbTx('readwrite');
+    for (let i = 0; i < n; i++) await idbReq(store.delete(`${id}_${i}`));
+  } catch(e) { console.warn('delPhs error', e); }
+}
+
+// ── Migration automatique localStorage → IndexedDB ──
+// Exécutée une seule fois au premier lancement de cette version.
+// Cherche les clés gm_ph_* dans localStorage et les déplace dans IDB.
+async function migratePhotos() {
+  const migKey = 'gm_idb_migrated_v1';
+  if (localStorage.getItem(migKey)) return; // déjà fait
+
+  const keys = [];
+  for (let k in localStorage) {
+    if (k.startsWith('gm_ph_')) keys.push(k);
+  }
+  if (!keys.length) { localStorage.setItem(migKey, '1'); return; }
+
+  toast('⏳ Migration photos en cours…');
+  let count = 0;
+  for (const k of keys) {
+    const val = localStorage.getItem(k);
+    if (!val) continue;
+    // Clé format : gm_ph_loc123_456_0  →  IDB key : loc123_456_0
+    const idbKey = k.replace(/^gm_ph_/, '');
+    try {
+      const { store } = await idbTx('readwrite');
+      await idbReq(store.put(val, idbKey));
+      localStorage.removeItem(k);
+      count++;
+    } catch(e) { console.warn('migrate error', k, e); }
+  }
+  localStorage.setItem(migKey, '1');
+  if (count > 0) toast(`✓ ${count} photo(s) migrées vers stockage étendu`);
 }
 
 // ═══════════════════════════════════════════════
@@ -896,7 +966,7 @@ function openAdd(lat, lng) {
   openOv('add-ov');
 }
 
-function openEdit(id) {
+async function openEdit(id) {
   const loc = locs.find(l => l.id === id);
   if (!loc) return;
   cSt = loc.status; cRec = loc.recommendation || 'none';
@@ -927,7 +997,7 @@ function openEdit(id) {
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
   pendPh = []; editPh = [];
   const n = loc.photoCount || 0;
-  for (let i = 0; i < n; i++) { const p = loadPh(loc.id, i); if (p) editPh.push(p); }
+  for (let i = 0; i < n; i++) { const p = await loadPh(loc.id, i); if (p) editPh.push(p); }
   renderPGrid([...editPh]);
   openOv('add-ov');
 }
@@ -995,7 +1065,7 @@ function compress(src, cb) {
   img.src = src;
 }
 
-function saveLoc() {
+async function saveLoc() {
   const name = document.getElementById('fn').value.trim();
   if (!name) { toast('⚠️ Le nom est obligatoire'); return; }
   const eid = document.getElementById('eid').value;
@@ -1031,7 +1101,7 @@ function saveLoc() {
     })()
   };
 
-  allPh.forEach((p, i) => savePh(id, i, p));
+  for (let i = 0; i < allPh.length; i++) await savePh(id, i, allPh[i]);
 
   if (isEdit) {
     const idx = locs.findIndex(l => l.id === eid);
@@ -1054,10 +1124,10 @@ function askDel() {
   document.getElementById('cdlg').classList.add('open');
 }
 function closeCd() { document.getElementById('cdlg').classList.remove('open'); }
-function doDel() {
+async function doDel() {
   const eid = document.getElementById('eid').value; if (!eid) return;
   const loc = locs.find(l => l.id === eid);
-  delPhs(eid, loc?.photoCount || 0);
+  await delPhs(eid, loc?.photoCount || 0);
   locs = locs.filter(l => l.id !== eid);
   saveData();
   closeCd();
@@ -1071,10 +1141,10 @@ function doDel() {
 // ═══════════════════════════════════════════════
 // DÉTAIL
 // ═══════════════════════════════════════════════
-function openDet(id) {
+async function openDet(id) {
   const loc = locs.find(l => l.id === id); if (!loc) return;
   const phs = [];
-  for (let i = 0; i < (loc.photoCount || 0); i++) { const p = loadPh(id, i); if (p) phs.push(p); }
+  for (let i = 0; i < (loc.photoCount || 0); i++) { const p = await loadPh(id, i); if (p) phs.push(p); }
   const rc = loc.recommendation || 'none';
   const reI = { optim: '📡', new_site: '🏗️', serenguetti: '📶', none: '✅' }[rc];
   const sc = SC[loc.status];
@@ -1407,7 +1477,7 @@ async function exportZIP() {
     for (const loc of locs) {
       const n = loc.photoCount || 0;
       for (let i = 0; i < n; i++) {
-        const b64 = loadPh(loc.id, i);
+        const b64 = await loadPh(loc.id, i);
         if (!b64) continue;
         // Extraire la partie base64 pure (sans le préfixe data:image/jpeg;base64,)
         const match = b64.match(/^data:([^;]+);base64,(.+)$/);
@@ -1487,7 +1557,7 @@ async function restoreFromZip(file) {
     const newLocs = JSON.parse(await dataFile.async('string'));
 
     // ── Supprimer les anciennes données ──
-    locs.forEach(l => delPhs(l.id, l.photoCount || 0));
+    for (const l of locs) await delPhs(l.id, l.photoCount || 0);
     locs = [];
 
     // ── Restaurer les photos ──
@@ -1498,14 +1568,13 @@ async function restoreFromZip(file) {
       const n = loc.photoCount || 0;
       for (let i = 0; i < n; i++) {
         const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
-        // Cherche jpg ou png
         let photoFile = photoFolder.file(`${safeName}_${i+1}.jpg`) ||
                         photoFolder.file(`${safeName}_${i+1}.jpeg`) ||
                         photoFolder.file(`${safeName}_${i+1}.png`);
         if (!photoFile) continue;
         const b64data = await photoFile.async('base64');
         const ext = photoFile.name.endsWith('.png') ? 'png' : 'jpeg';
-        savePh(loc.id, i, `data:image/${ext};base64,${b64data}`);
+        await savePh(loc.id, i, `data:image/${ext};base64,${b64data}`);
         photoRestored++;
       }
     }
@@ -1947,8 +2016,8 @@ function confirmReplace() {
   executeImport(true);
 }
 
-function executeImport(replace) {
-  if (replace) { locs.forEach(l => delPhs(l.id, l.photoCount || 0)); locs = []; }
+async function executeImport(replace) {
+  if (replace) { for (const l of locs) await delPhs(l.id, l.photoCount || 0); locs = []; }
   const newLocs = impPendingRows.map(rowToLoc);
   locs = [...locs, ...newLocs];
   saveData();
@@ -2054,11 +2123,17 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 // ═══════════════════════════════════════════════
 // INITIALISATION
 // ═══════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  // Ouvrir IndexedDB en premier (avant tout accès photos)
+  try { await openIDB(); } catch(e) { console.warn('IDB indisponible:', e); }
+
   loadData();
   initMap();
   refreshMap();
   updHdr();
+
+  // Migration automatique photos localStorage → IndexedDB
+  migratePhotos().catch(e => console.warn('Migration error:', e));
 
   // URL hash routing
   const hash = location.hash.replace('#', '');
