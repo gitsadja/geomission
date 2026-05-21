@@ -221,7 +221,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .hp-marker{position:absolute;top:-4px;right:-4px;background:#f59e0b;color:white;
   border-radius:50%;width:14px;height:14px;font-size:9px;display:flex;align-items:center;
   justify-content:center;font-weight:800;border:1.5px solid white;}
-#photo-input{display:none;}
+#photo-cam,#photo-gal,#video-cam,#video-gal{display:none;}
 
 /* DETAIL */
 .det-hero{padding:14px 16px 16px;border-radius:20px 20px 0 0;}
@@ -643,21 +643,26 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
     <div class="fg">
       <label class="flbl">Photos (max 3)</label>
       <div class="pgrid" id="pgrid">
-        <div class="padd" onclick="document.getElementById('photo-input').click()">📷</div>
+        <div class="padd" onclick="document.getElementById('photo-cam').click()" title="Prendre une photo">📷</div>
+        <div class="padd" onclick="document.getElementById('photo-gal').click()" title="Choisir dans la galerie">🖼️</div>
       </div>
-      <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePh(event)">
+      <input type="file" id="photo-cam" accept="image/*" capture="environment" multiple onchange="handlePh(event)" style="display:none">
+      <input type="file" id="photo-gal" accept="image/*" multiple onchange="handlePh(event)" style="display:none">
+      <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">📷 Caméra &nbsp;·&nbsp; 🖼️ Galerie/fichiers</div>
     </div>
 
     <div class="fg">
       <label class="flbl">Vidéo (max 10 MB)</label>
       <div id="vgrid" style="margin-top:6px;">
-        <div class="padd" id="vadd" onclick="document.getElementById('video-input').click()" style="width:100%;height:52px;border-radius:8px;">
-          🎥 Ajouter une vidéo
+        <div style="display:flex;gap:7px;">
+          <div class="padd" onclick="document.getElementById('video-cam').click()" style="flex:1;height:52px;border-radius:8px;">🎥 Caméra</div>
+          <div class="padd" onclick="document.getElementById('video-gal').click()" style="flex:1;height:52px;border-radius:8px;">📁 Galerie</div>
         </div>
       </div>
-      <input type="file" id="video-input" accept="video/*" onchange="handleVid(event)" style="display:none">
+      <input type="file" id="video-cam" accept="video/*" capture="environment" onchange="handleVid(event)" style="display:none">
+      <input type="file" id="video-gal" accept="video/*" onchange="handleVid(event)" style="display:none">
       <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">
-        Formats acceptés : mp4, mov, webm · Limite : 10 MB
+        Formats : mp4, mov, webm · Limite 10 MB
       </div>
     </div>
 
@@ -1186,7 +1191,7 @@ function renderPGrid(photos) {
   });
   if (photos.length < 3) {
     const a = document.createElement('div'); a.className = 'padd'; a.innerHTML = '📷';
-    a.onclick = () => document.getElementById('photo-input').click(); g.appendChild(a);
+    a.onclick = () => document.getElementById('photo-gal').click(); g.appendChild(a);
   }
 }
 
@@ -1231,8 +1236,10 @@ function renderVGrid(vidSrc) {
           display:flex;align-items:center;justify-content:center;">✕</button>
       </div>`;
   } else {
-    g.innerHTML = `<div class="padd" id="vadd" onclick="document.getElementById('video-input').click()"
-      style="width:100%;height:52px;border-radius:8px;">🎥 Ajouter une vidéo</div>`;
+    g.innerHTML = `<div style="display:flex;gap:7px;">
+      <div class="padd" onclick="document.getElementById('video-cam').click()" style="flex:1;height:52px;border-radius:8px;">🎥 Caméra</div>
+      <div class="padd" onclick="document.getElementById('video-gal').click()" style="flex:1;height:52px;border-radius:8px;">📁 Galerie</div>
+    </div>`;
   }
 }
 
