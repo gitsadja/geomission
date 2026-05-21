@@ -185,6 +185,9 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 /* Badges liste */
 .rb-non_evalue{background:#f0f1f3;color:#8a8f9e;}
 .rb-ok_macro{background:#fdecea;color:#e53935;}
+.rb-ok_voisin{background:#e1f5fe;color:#0277bd;}
+.tr-ok_voisin.active{background:#0277bd;border-color:#0277bd;color:white;}
+.rec-box.ok_voisin{background:#e1f5fe;}
 .rb-ok_serenguetti{background:#f3e5f5;color:#7b1fa2;}
 .rb-nok_optim{background:#e3f0fb;color:#1565c0;}
 .rb-nok_nopotentiel{background:#f0f1f3;color:#555;}
@@ -319,7 +322,25 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* MAP POPUP */
+/* MAP PICKER */
+.map-picker-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:none;align-items:flex-end;}
+.map-picker-modal.open{display:flex;}
+.map-picker-sheet{background:white;border-radius:20px 20px 0 0;width:100%;height:75dvh;display:flex;flex-direction:column;}
+.map-picker-hdr{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.map-picker-title{font-size:15px;font-weight:800;}
+.map-picker-hint{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);margin-top:2px;}
+#map-picker-container{flex:1;position:relative;}
+#map-picker{width:100%;height:100%;}
+.map-picker-confirm{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+  background:var(--brand);color:white;border:none;border-radius:25px;padding:11px 28px;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:var(--sh2);white-space:nowrap;z-index:10;display:none;}
+.map-picker-confirm.visible{display:block;}
+.map-picker-crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:24px;height:24px;pointer-events:none;z-index:10;opacity:.5;}
+#picker-coords-display{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.7);color:white;border-radius:20px;padding:5px 12px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;z-index:10;display:none;white-space:nowrap;}
 .leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:var(--sh2)!important;padding:0!important;}
 .leaflet-popup-content{margin:0!important;}
 .mpop{font-family:'Syne',sans-serif;padding:12px;min-width:170px;}
@@ -450,6 +471,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div class="fchip" data-f="extra" onclick="setFilter(this)">⭐ Hors planning</div>
         <div class="fchip" data-f="ok_macro" onclick="setFilter(this)">🏗️ Site Macro</div>
         <div class="fchip" data-f="ok_serenguetti" onclick="setFilter(this)">📶 Sérénguetti</div>
+        <div class="fchip" data-f="ok_voisin" onclick="setFilter(this)">🔗 Site voisin</div>
         <div class="fchip" data-f="nok_optim" onclick="setFilter(this)">📡 Optim.</div>
       </div>
     </div>
@@ -606,6 +628,37 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div id="rec-ok-sub" class="tgrp">
           <div class="tbtn tr-ok_macro active" data-r="ok_macro" onclick="selR(this)">🏗️ Site Macro</div>
           <div class="tbtn tr-ok_serenguetti" data-r="ok_serenguetti" onclick="selR(this)">📶 Sérénguetti</div>
+          <div class="tbtn tr-ok_voisin" data-r="ok_voisin" onclick="selR(this)">🔗 Site voisin</div>
+        </div>
+        <!-- Champs Site voisin — visibles uniquement si ok_voisin -->
+        <div id="voisin-fields" style="display:none;margin-top:8px;">
+          <div class="frow">
+            <div class="fg" style="margin-bottom:0">
+              <label class="flbl">Localité pivot</label>
+              <input type="text" class="fi" id="fvoisin" placeholder="Ex: NDIANE">
+            </div>
+            <div class="fg" style="margin-bottom:0">
+              <label class="flbl">Distance (km)</label>
+              <input type="number" class="fi" id="fvoisindist" placeholder="km" step="0.1">
+            </div>
+          </div>
+          <div class="frow" style="margin-top:7px;">
+            <div class="fg" style="margin-bottom:0">
+              <label class="flbl">Latitude cible</label>
+              <input type="number" class="fi" id="fvoisinlat" placeholder="Latitude" step="0.000001">
+            </div>
+            <div class="fg" style="margin-bottom:0">
+              <label class="flbl">Longitude cible</label>
+              <input type="number" class="fi" id="fvoisinlng" placeholder="Longitude" step="0.000001">
+            </div>
+          </div>
+          <button type="button" onclick="openMapPicker()"
+            style="width:100%;margin-top:7px;padding:9px;background:var(--bg2);border:1.5px solid var(--brd);
+            border-radius:8px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;
+            color:var(--tx);display:flex;align-items:center;justify-content:center;gap:6px;transition:border-color .12s;"
+            onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--brd)'">
+            🗺️ Choisir sur la carte
+          </button>
         </div>
         <!-- Niveau 2 : sous-options NOK -->
         <div id="rec-nok-sub" class="tgrp" style="display:none">
@@ -796,6 +849,26 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   </div>
 </div>
 
+<!-- MAP PICKER MODAL -->
+<div class="map-picker-modal" id="map-picker-modal">
+  <div class="map-picker-sheet">
+    <div class="map-picker-hdr">
+      <div>
+        <div class="map-picker-title">📍 Choisir la localité cible</div>
+        <div class="map-picker-hint">Tapez sur la carte pour positionner le site voisin</div>
+      </div>
+      <button class="mclose" onclick="closeMapPicker()">✕</button>
+    </div>
+    <div id="map-picker-container">
+      <div id="map-picker"></div>
+      <div id="picker-coords-display"></div>
+      <button class="map-picker-confirm" id="map-picker-confirm" onclick="confirmPickerLocation()">
+        ✓ Confirmer cette position
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM -->
 <div class="cdlg" id="cdlg">
   <div class="cdbox">
@@ -827,6 +900,7 @@ const RL = {
   non_evalue:        '— Non évalué',
   ok_macro:          '🏗️ Site Macro',
   ok_serenguetti:    '📶 Sérénguetti',
+  ok_voisin:         '🔗 Site voisin',
   nok_optim:         '📡 Optimisation',
   nok_nopotentiel:   '🚫 Pas de potentiel',
   nok_covered:       '✅ Déjà couverte',
@@ -836,7 +910,7 @@ const RL = {
 };
 const RC = {
   non_evalue:'#8a8f9e',
-  ok_macro:'#e53935', ok_serenguetti:'#7b1fa2',
+  ok_macro:'#e53935', ok_serenguetti:'#7b1fa2', ok_voisin:'#0277bd',
   nok_optim:'#1565c0', nok_nopotentiel:'#555', nok_covered:'#2e7d32',
   none:'#2e7d32', optim:'#1565c0', serenguetti:'#7b1fa2', new_site:'#e53935'
 };
@@ -1088,7 +1162,7 @@ function openAdd(lat, lng) {
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
-  ['fn','fpop','feco','fsite','fdist','fnotes','fsubs'].forEach(id => document.getElementById(id).value = '');
+  ['fn','fpop','feco','fsite','fdist','fnotes','fsubs','fvoisin','fvoisindist','fvoisinlat','fvoisinlng'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('flat').value = lat || '';
   document.getElementById('flng').value = lng || '';
   document.getElementById('flouma').value = '';
@@ -1131,6 +1205,10 @@ async function openEdit(id) {
   document.getElementById('fdist').value = loc.distanceToSite || '';
   document.getElementById('fsig').value = loc.signalQuality || '';
   document.getElementById('fnotes').value = loc.notes || '';
+  const fv=document.getElementById('fvoisin'); if(fv) fv.value=loc.siteVoisin||'';
+  const fvd=document.getElementById('fvoisindist'); if(fvd) fvd.value=loc.siteVoisinDist||'';
+  const fvlat=document.getElementById('fvoisinlat'); if(fvlat) fvlat.value=loc.siteVoisinLat||'';
+  const fvlng=document.getElementById('fvoisinlng'); if(fvlng) fvlng.value=loc.siteVoisinLng||'';
   // Date de visite — convertit timestamp en format YYYY-MM-DD pour l'input date
   document.getElementById('fvisitdate').value = loc.visitedAt
     ? new Date(loc.visitedAt).toISOString().slice(0, 10) : '';
@@ -1161,6 +1239,8 @@ function resetFormToggles() {
   document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'   ? 'flex' : 'none';
   document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok'  ? 'flex' : 'none';
   document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
+  const vf = document.getElementById('voisin-fields');
+  if (vf) vf.style.display = cRec === 'ok_voisin' ? 'block' : 'none';
   // Concurrence
   document.querySelectorAll('.conc-btn').forEach(b => {
     b.classList.toggle('active', cConc.includes(b.dataset.c));
@@ -1196,6 +1276,9 @@ function selR(el) {
   cRec = el.dataset.r;
   document.querySelectorAll('[data-r]').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  // Afficher/masquer les champs site voisin
+  const vf = document.getElementById('voisin-fields');
+  if (vf) vf.style.display = cRec === 'ok_voisin' ? 'block' : 'none';
 }
 
 function toggleConc(el) {
@@ -1336,6 +1419,10 @@ async function saveLoc() {
     nearestSite: document.getElementById('fsite').value || null,
     distanceToSite: document.getElementById('fdist').value || null,
     signalQuality: document.getElementById('fsig').value || null,
+    siteVoisin: (cRec === 'ok_voisin' ? (document.getElementById('fvoisin')?.value || null) : null),
+    siteVoisinDist: (cRec === 'ok_voisin' ? (document.getElementById('fvoisindist')?.value || null) : null),
+    siteVoisinLat: (cRec === 'ok_voisin' ? (parseFloat(document.getElementById('fvoisinlat')?.value)||null) : null),
+    siteVoisinLng: (cRec === 'ok_voisin' ? (parseFloat(document.getElementById('fvoisinlng')?.value)||null) : null),
     notes: document.getElementById('fnotes').value || null,
     isExtra: cExtra,
     photoCount: allPh.length,
@@ -1400,10 +1487,13 @@ async function openDet(id) {
   const phs = [];
   for (let i = 0; i < (loc.photoCount || 0); i++) { const p = await loadPh(id, i); if (p) phs.push(p); }
   const rc = migrateRec(loc.recommendation, loc.status);
-  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', non_evalue:'—', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '—';
+  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', ok_voisin:'🔗', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', non_evalue:'—', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '—';
+  const voisinInfo = rc === 'ok_voisin' && loc.siteVoisin
+    ? `Site proposé sur <strong>${loc.siteVoisin}</strong>${loc.siteVoisinDist ? ' · ' + loc.siteVoisinDist + ' km' : ''}${loc.siteVoisinLat && loc.siteVoisinLng ? ` · <span style="font-family:'JetBrains Mono',monospace;font-size:11px">${Number(loc.siteVoisinLat).toFixed(5)}, ${Number(loc.siteVoisinLng).toFixed(5)}</span>` : ''}` : null;
   const recDesc = {
     ok_macro:        'Potentiel justifiant un nouveau site Macro complet',
     ok_serenguetti:  'Potentiel moyen — site Sérénguetti (couverture/capacité réduites)',
+    ok_voisin: voisinInfo || 'Site proposé sur une localité voisine à fort potentiel',
     nok_optim:       'Ajustement tilt, azimut ou puissance sur site existant',
     nok_nopotentiel: 'Potentiel insuffisant — aucun déploiement recommandé',
     nok_covered:     'Zone déjà bien couverte par Orange — aucune action requise',
@@ -1521,6 +1611,7 @@ function renderList() {
     else if (curFilter === 'extra') mf = !!loc.isExtra;
     else if (curFilter === 'ok_macro') mf = migrateRec(loc.recommendation, loc.status) === 'ok_macro';
     else if (curFilter === 'ok_serenguetti') mf = migrateRec(loc.recommendation, loc.status) === 'ok_serenguetti';
+    else if (curFilter === 'ok_voisin') mf = migrateRec(loc.recommendation, loc.status) === 'ok_voisin';
     else if (curFilter === 'nok_optim') mf = migrateRec(loc.recommendation, loc.status) === 'nok_optim';
     else if (curFilter === 'new_site') mf = migrateRec(loc.recommendation, loc.status) === 'ok_macro';
     else if (curFilter === 'serenguetti') mf = migrateRec(loc.recommendation, loc.status) === 'ok_serenguetti';
@@ -1543,7 +1634,7 @@ function renderList() {
         <div class="lcard-name">${loc.name}</div>
         ${loc.isExtra ? `<span class="hp-badge">⭐</span>` : ''}
         ${loc.status === 'introuvable' ? `<span class="rbadge rb-introuvable">✗ Introuvable</span>` : ''}
-        ${rc && rc !== 'nok_covered' && rc !== 'nok_nopotentiel' ? `<span class="rbadge rb-${rc}">${(RL[rc]||rc).replace(/^[^\s]+ /,'')}</span>` : ''}
+        ${rc && !['nok_covered','nok_nopotentiel','non_evalue'].includes(rc) ? `<span class="rbadge rb-${rc}">${rc==='ok_macro'?'Macro':rc==='ok_serenguetti'?'Sérénguetti':rc==='ok_voisin'?'Site voisin':rc==='nok_optim'?'Optim.':''}</span>` : ''}
       </div>
       <div class="lcard-meta">
         ${loc.population ? `<span class="mchip">👥 ${Number(loc.population).toLocaleString()}</span>` : ''}
@@ -1551,6 +1642,7 @@ function renderList() {
         ${loc.hasMarket ? `<span class="mchip">🏪 Marché</span>` : ''}
         ${loc.potential ? `<span class="mchip">⚡ ${loc.potential}</span>` : ''}
         ${loc.nearestSite ? `<span class="mchip">📡 ${loc.nearestSite}${loc.distanceToSite ? ' ' + loc.distanceToSite + 'km' : ''}</span>` : ''}
+        ${rc === 'ok_voisin' && loc.siteVoisin ? `<span class="mchip">🔗 ${loc.siteVoisin}${loc.siteVoisinDist?' '+loc.siteVoisinDist+'km':''}</span>` : ''}
         ${loc.photoCount ? `<span class="mchip">📷 ${loc.photoCount}</span>` : ''}
         ${loc.hasVideo ? `<span class="mchip">🎥 Vidéo</span>` : ''}
       </div>
@@ -1571,6 +1663,7 @@ function renderReport() {
   const pend  = locs.filter(l => l.status === 'pending').length;
   const ns    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_macro').length;
   const sr    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_serenguetti').length;
+  const ov    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_voisin').length;
   const op    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'nok_optim').length;
   const concYas     = locs.filter(l => (l.concurrence||[]).includes('Yas')).length;
   const concExpresso = locs.filter(l => (l.concurrence||[]).includes('Expresso')).length;
@@ -1598,8 +1691,8 @@ function renderReport() {
       <div class="scard" style="border-color:#7b1fa2"><div class="sv" style="color:#7b1fa2">${sr}</div><div class="sl">Sites Sérénguetti</div></div>
     </div>
     <div class="sgrid" style="margin-bottom:14px">
+      <div class="scard" style="border-color:#0277bd"><div class="sv" style="color:#0277bd">${ov}</div><div class="sl">Sites voisins</div></div>
       <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations</div></div>
-      <div class="scard"><div class="sv">${intro}</div><div class="sl">Introuvables</div></div>
     </div>
     ${concYas || concExpresso ? `
     <div class="sec-t" style="margin-bottom:8px">Concurrence détectée</div>
@@ -1630,6 +1723,7 @@ function renderReport() {
           ${loc.potential ? `<span>⚡ ${loc.potential}</span>` : ''}
           ${loc.nearestSite ? `<span>📡 ${loc.nearestSite}${loc.distanceToSite ? ' (' + loc.distanceToSite + 'km)' : ''}</span>` : ''}
           ${loc.signalQuality ? `<span>📶 ${loc.signalQuality}</span>` : ''}
+          ${rc === 'ok_voisin' && loc.siteVoisin ? `<span>🔗 Site voisin: ${loc.siteVoisin}${loc.siteVoisinDist?' ('+loc.siteVoisinDist+'km)':''}</span>` : ''}
           ${loc.visitedAt ? `<span>🗓️ ${new Date(loc.visitedAt).toLocaleDateString('fr-FR')}</span>` : ''}
           ${(loc.concurrence||[]).length ? `<span>🏁 Conc: ${loc.concurrence.join(', ')}</span>` : ''}
         </div>
@@ -2425,7 +2519,103 @@ window.addEventListener('offline', () => {
 if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
 
 // ═══════════════════════════════════════════════
-// SERVICE WORKER — AUTO-UPDATE
+// MAP PICKER — sélection localité cible sur carte
+// ═══════════════════════════════════════════════
+let pickerMap = null;
+let pickerMarker = null;
+let pickerLat = null;
+let pickerLng = null;
+
+function openMapPicker() {
+  document.getElementById('map-picker-modal').classList.add('open');
+
+  // Init carte si première ouverture
+  setTimeout(() => {
+    if (!pickerMap) {
+      // Centrer sur la localité courante si coords disponibles
+      const curLat = parseFloat(document.getElementById('flat').value) || 14.3;
+      const curLng = parseFloat(document.getElementById('flng').value) || -14.5;
+
+      pickerMap = L.map('map-picker', { center: [curLat, curLng], zoom: 12, zoomControl: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(pickerMap);
+
+      // Afficher les localités existantes comme référence
+      locs.forEach(loc => {
+        if (!loc.lat || !loc.lng) return;
+        L.circleMarker([loc.lat, loc.lng], {
+          radius: 5, color: SC[loc.status] || '#8a8f9e',
+          fillColor: SC[loc.status] || '#8a8f9e', fillOpacity: 0.7, weight: 1.5
+        }).addTo(pickerMap).bindTooltip(loc.name, { permanent: false });
+      });
+
+      // Tap sur la carte → placer le marqueur cible
+      pickerMap.on('click', e => {
+        pickerLat = e.latlng.lat;
+        pickerLng = e.latlng.lng;
+
+        // Marqueur cible (étoile orange)
+        if (pickerMarker) pickerMap.removeLayer(pickerMarker);
+        pickerMarker = L.marker([pickerLat, pickerLng], {
+          icon: L.divIcon({
+            html: `<div style="background:#FF6600;width:22px;height:22px;border-radius:50%;
+              border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);
+              display:flex;align-items:center;justify-content:center;
+              font-size:12px;color:white;font-weight:800;">★</div>`,
+            className: '', iconSize: [22,22], iconAnchor: [11,11]
+          })
+        }).addTo(pickerMap);
+
+        // Afficher les coordonnées
+        const cd = document.getElementById('picker-coords-display');
+        cd.textContent = `${pickerLat.toFixed(5)}, ${pickerLng.toFixed(5)}`;
+        cd.style.display = 'block';
+
+        // Calculer distance depuis la localité courante
+        const srcLat = parseFloat(document.getElementById('flat').value);
+        const srcLng = parseFloat(document.getElementById('flng').value);
+        if (!isNaN(srcLat) && !isNaN(srcLng)) {
+          const dist = haversineDist(srcLat, srcLng, pickerLat, pickerLng);
+          cd.textContent += ` · ${dist.toFixed(1)} km`;
+          // Pré-remplir la distance
+          const fvd = document.getElementById('fvoisindist');
+          if (fvd) fvd.value = dist.toFixed(1);
+        }
+
+        document.getElementById('map-picker-confirm').classList.add('visible');
+      });
+    } else {
+      // Réinitialiser si rouvert
+      pickerMap.invalidateSize();
+      const curLat = parseFloat(document.getElementById('flat').value) || 14.3;
+      const curLng = parseFloat(document.getElementById('flng').value) || -14.5;
+      if (!isNaN(curLat)) pickerMap.setView([curLat, curLng], 12);
+    }
+  }, 120);
+}
+
+function closeMapPicker() {
+  document.getElementById('map-picker-modal').classList.remove('open');
+}
+
+function confirmPickerLocation() {
+  if (pickerLat === null || pickerLng === null) return;
+  document.getElementById('fvoisinlat').value = pickerLat.toFixed(6);
+  document.getElementById('fvoisinlng').value = pickerLng.toFixed(6);
+  closeMapPicker();
+  toast(`✓ Position cible : ${pickerLat.toFixed(4)}, ${pickerLng.toFixed(4)}`);
+}
+
+// Calcul distance Haversine (km)
+function haversineDist(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 // ═══════════════════════════════════════════════
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').then(reg => {
