@@ -1,4 +1,4 @@
-const CACHE = 'geomission-v7';
+const CACHE = 'geomission-v8';
 const ASSETS = [
   './',
   './index.html',

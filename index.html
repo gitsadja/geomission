@@ -645,7 +645,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div class="pgrid" id="pgrid">
         <div class="padd" onclick="document.getElementById('photo-input').click()">📷</div>
       </div>
-      <input type="file" id="photo-input" accept="image/*" capture="environment" multiple onchange="handlePh(event)">
+      <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePh(event)">
     </div>
 
     <div class="fg">
@@ -655,7 +655,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
           🎥 Ajouter une vidéo
         </div>
       </div>
-      <input type="file" id="video-input" accept="video/*" capture="environment" onchange="handleVid(event)" style="display:none">
+      <input type="file" id="video-input" accept="video/*" onchange="handleVid(event)" style="display:none">
       <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">
         Formats acceptés : mp4, mov, webm · Limite : 10 MB
       </div>
