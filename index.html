@@ -1190,8 +1190,15 @@ function renderPGrid(photos) {
     img.onclick = () => viewPh(p); g.appendChild(img);
   });
   if (photos.length < 3) {
-    const a = document.createElement('div'); a.className = 'padd'; a.innerHTML = '📷';
-    a.onclick = () => document.getElementById('photo-gal').click(); g.appendChild(a);
+    const cam = document.createElement('div');
+    cam.className = 'padd'; cam.title = 'Prendre une photo'; cam.innerHTML = '📷';
+    cam.onclick = () => document.getElementById('photo-cam').click();
+    g.appendChild(cam);
+
+    const gal = document.createElement('div');
+    gal.className = 'padd'; gal.title = 'Choisir dans la galerie'; gal.innerHTML = '🖼️';
+    gal.onclick = () => document.getElementById('photo-gal').click();
+    g.appendChild(gal);
   }
 }
 
