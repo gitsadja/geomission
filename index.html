@@ -171,6 +171,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 /* Rec niveau 1 */
 .rec-ok.active{background:#2e7d32;color:white;border-color:#2e7d32;}
 .rec-nok.active{background:#e53935;color:white;border-color:#e53935;}
+.rec-neval.active{background:#8a8f9e;color:white;border-color:#8a8f9e;}
 /* Rec niveau 2 OK */
 .tr-ok_macro.active{background:#e53935;border-color:#e53935;color:white;}
 .tr-ok_serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;color:white;}
@@ -182,6 +183,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .conc-btn.active{background:#FF6600;border-color:#FF6600;color:white;}
 .conc-none.active{background:#8a8f9e;border-color:#8a8f9e;color:white;}
 /* Badges liste */
+.rb-non_evalue{background:#f0f1f3;color:#8a8f9e;}
 .rb-ok_macro{background:#fdecea;color:#e53935;}
 .rb-ok_serenguetti{background:#f3e5f5;color:#7b1fa2;}
 .rb-nok_optim{background:#e3f0fb;color:#1565c0;}
@@ -594,9 +596,10 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <!-- 13. PRÉCONISATION 2 NIVEAUX -->
       <div class="fg">
         <label class="flbl">Préconisation couverture</label>
-        <!-- Niveau 1 : OK / NOK -->
+        <!-- Niveau 1 : Non évalué / OK / NOK -->
         <div class="tgrp" style="margin-bottom:7px;">
-          <div class="tbtn rec-ok active" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
+          <div class="tbtn rec-neval" data-rl="neval" onclick="selRecL1(this)" style="flex:1">— Non évalué</div>
+          <div class="tbtn rec-ok" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
           <div class="tbtn rec-nok" data-rl="nok" onclick="selRecL1(this)" style="flex:1">❌ NOK</div>
         </div>
         <!-- Niveau 2 : sous-options OK -->
@@ -821,6 +824,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓',introuvable:'Introuvable ✗'};
 const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32',introuvable:'#4a4f5c'};
 const RL = {
+  non_evalue:        '— Non évalué',
   ok_macro:          '🏗️ Site Macro',
   ok_serenguetti:    '📶 Sérénguetti',
   nok_optim:         '📡 Optimisation',
@@ -831,16 +835,23 @@ const RL = {
   serenguetti:'📶 Sérénguetti', new_site:'🏗️ Site Macro'
 };
 const RC = {
+  non_evalue:'#8a8f9e',
   ok_macro:'#e53935', ok_serenguetti:'#7b1fa2',
   nok_optim:'#1565c0', nok_nopotentiel:'#555', nok_covered:'#2e7d32',
   none:'#2e7d32', optim:'#1565c0', serenguetti:'#7b1fa2', new_site:'#e53935'
 };
 // Normalise les anciens codes vers les nouveaux
-function migrateRec(r) {
-  if (!r || r === 'none')        return 'nok_covered';
-  if (r === 'new_site')          return 'ok_macro';
-  if (r === 'serenguetti')       return 'ok_serenguetti';
-  if (r === 'optim')             return 'nok_optim';
+// status optionnel pour distinguer "non évalué" de "déjà couverte"
+function migrateRec(r, status) {
+  if (!r || r === 'none') {
+    // Si pas visité → jamais évalué, pas "déjà couverte"
+    const visited = !status || status === 'visited' || status === 'introuvable';
+    return visited ? 'nok_covered' : 'non_evalue';
+  }
+  if (r === 'non_evalue')    return 'non_evalue';
+  if (r === 'new_site')      return 'ok_macro';
+  if (r === 'serenguetti')   return 'ok_serenguetti';
+  if (r === 'optim')         return 'nok_optim';
   return r; // déjà nouveau code
 }
 const SORT_ORD = {priority:0,pending:1,visiting:2,visited:3};
@@ -932,7 +943,36 @@ async function delPhs(id, n) {
   } catch(e) { console.warn('delPhs error', e); }
 }
 
-// ── Migration automatique localStorage → IndexedDB ──
+// ── Migration données : nok_covered → non_evalue pour les non-visités ──
+// Exécutée une seule fois pour corriger les données migrées avec l'ancien code.
+function migrateRecData() {
+  const migKey = 'gm_rec_migrated_v1';
+  if (localStorage.getItem(migKey)) return 0;
+
+  let count = 0;
+  locs.forEach(loc => {
+    // nok_covered attribué par défaut à des localités non visitées → corriger
+    if (
+      (loc.recommendation === 'nok_covered' || loc.recommendation === 'none' || !loc.recommendation) &&
+      loc.status !== 'visited' &&
+      loc.status !== 'introuvable'
+    ) {
+      loc.recommendation = 'non_evalue';
+      count++;
+    }
+    // Migrer aussi les anciens codes legacy restants
+    if (loc.recommendation === 'new_site')    { loc.recommendation = 'ok_macro';       count++; }
+    if (loc.recommendation === 'serenguetti') { loc.recommendation = 'ok_serenguetti'; count++; }
+    if (loc.recommendation === 'optim')       { loc.recommendation = 'nok_optim';      count++; }
+  });
+
+  if (count > 0) {
+    saveData();
+    console.log(`[GeoMission] Migration rec: ${count} localité(s) corrigée(s)`);
+  }
+  localStorage.setItem(migKey, '1');
+  return count;
+}
 // Exécutée une seule fois au premier lancement de cette version.
 // Cherche les clés gm_ph_* dans localStorage et les déplace dans IDB.
 async function migratePhotos() {
@@ -1044,7 +1084,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
+  cSt = 'pending'; cRec = 'non_evalue'; cRecL1 = 'neval'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -1070,9 +1110,9 @@ async function openEdit(id) {
   const loc = locs.find(l => l.id === id);
   if (!loc) return;
   cSt = loc.status;
-  const rawRec = migrateRec(loc.recommendation);
+  const rawRec = migrateRec(loc.recommendation, loc.status);
   cRec = rawRec;
-  cRecL1 = rawRec.startsWith('ok') ? 'ok' : 'nok';
+  cRecL1 = rawRec === 'non_evalue' ? 'neval' : rawRec.startsWith('ok') ? 'ok' : 'nok';
   cConc = loc.concurrence || [];
   document.getElementById('eid').value = loc.id;
   document.getElementById('add-ttl').textContent = 'Modifier Localité';
@@ -1116,10 +1156,10 @@ function resetFormToggles() {
   // Statut
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   // Rec niveau 1
-  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
+  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
   // Rec niveau 2
-  document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'  ? 'flex' : 'none';
-  document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok' ? 'flex' : 'none';
+  document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'   ? 'flex' : 'none';
+  document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok'  ? 'flex' : 'none';
   document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
   // Concurrence
   document.querySelectorAll('.conc-btn').forEach(b => {
@@ -1140,13 +1180,16 @@ function selS(el) {
 
 function selRecL1(el) {
   cRecL1 = el.dataset.rl;
-  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'  ? 'flex' : 'none';
-  document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok' ? 'flex' : 'none';
+  const isOk  = cRecL1 === 'ok';
+  const isNok = cRecL1 === 'nok';
+  document.getElementById('rec-ok-sub').style.display  = isOk  ? 'flex' : 'none';
+  document.getElementById('rec-nok-sub').style.display = isNok ? 'flex' : 'none';
   // Sélectionner la première sous-option par défaut
-  cRec = cRecL1 === 'ok' ? 'ok_macro' : 'nok_optim';
-  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
+  if (isOk)  { cRec = 'ok_macro';  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'ok_macro')); }
+  if (isNok) { cRec = 'nok_optim'; document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'nok_optim')); }
+  if (cRecL1 === 'neval') { cRec = 'non_evalue'; document.querySelectorAll('[data-r]').forEach(b => b.classList.remove('active')); }
 }
 
 function selR(el) {
@@ -1356,14 +1399,15 @@ async function openDet(id) {
   const loc = locs.find(l => l.id === id); if (!loc) return;
   const phs = [];
   for (let i = 0; i < (loc.photoCount || 0); i++) { const p = await loadPh(id, i); if (p) phs.push(p); }
-  const rc = migrateRec(loc.recommendation || 'nok_covered');
-  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '📋';
+  const rc = migrateRec(loc.recommendation, loc.status);
+  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', non_evalue:'—', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '—';
   const recDesc = {
     ok_macro:        'Potentiel justifiant un nouveau site Macro complet',
     ok_serenguetti:  'Potentiel moyen — site Sérénguetti (couverture/capacité réduites)',
     nok_optim:       'Ajustement tilt, azimut ou puissance sur site existant',
     nok_nopotentiel: 'Potentiel insuffisant — aucun déploiement recommandé',
-    nok_covered:     'Zone déjà bien couverte par Orange — aucune action requise'
+    nok_covered:     'Zone déjà bien couverte par Orange — aucune action requise',
+    non_evalue:      'Localité non encore évaluée sur le terrain'
   }[rc] || '';
   const sc = SC[loc.status];
   const isV = loc.status === 'visited';
@@ -1475,12 +1519,12 @@ function renderList() {
     let mf = true;
     if (curFilter === 'introuvable') mf = loc.status === 'introuvable';
     else if (curFilter === 'extra') mf = !!loc.isExtra;
-    else if (curFilter === 'ok_macro') mf = migrateRec(loc.recommendation) === 'ok_macro';
-    else if (curFilter === 'ok_serenguetti') mf = migrateRec(loc.recommendation) === 'ok_serenguetti';
-    else if (curFilter === 'nok_optim') mf = migrateRec(loc.recommendation) === 'nok_optim';
-    else if (curFilter === 'new_site') mf = migrateRec(loc.recommendation) === 'ok_macro';
-    else if (curFilter === 'serenguetti') mf = migrateRec(loc.recommendation) === 'ok_serenguetti';
-    else if (curFilter === 'optim') mf = migrateRec(loc.recommendation) === 'nok_optim';
+    else if (curFilter === 'ok_macro') mf = migrateRec(loc.recommendation, loc.status) === 'ok_macro';
+    else if (curFilter === 'ok_serenguetti') mf = migrateRec(loc.recommendation, loc.status) === 'ok_serenguetti';
+    else if (curFilter === 'nok_optim') mf = migrateRec(loc.recommendation, loc.status) === 'nok_optim';
+    else if (curFilter === 'new_site') mf = migrateRec(loc.recommendation, loc.status) === 'ok_macro';
+    else if (curFilter === 'serenguetti') mf = migrateRec(loc.recommendation, loc.status) === 'ok_serenguetti';
+    else if (curFilter === 'optim') mf = migrateRec(loc.recommendation, loc.status) === 'nok_optim';
     else if (curFilter !== 'all') mf = loc.status === curFilter;
     return ms && mf;
   }).sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
@@ -1525,9 +1569,9 @@ function renderReport() {
   const intro = locs.filter(l => l.status === 'introuvable').length;
   const pri   = locs.filter(l => l.status === 'priority').length;
   const pend  = locs.filter(l => l.status === 'pending').length;
-  const ns    = locs.filter(l => migrateRec(l.recommendation) === 'ok_macro').length;
-  const sr    = locs.filter(l => migrateRec(l.recommendation) === 'ok_serenguetti').length;
-  const op    = locs.filter(l => migrateRec(l.recommendation) === 'nok_optim').length;
+  const ns    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_macro').length;
+  const sr    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_serenguetti').length;
+  const op    = locs.filter(l => migrateRec(l.recommendation, l.status) === 'nok_optim').length;
   const concYas     = locs.filter(l => (l.concurrence||[]).includes('Yas')).length;
   const concExpresso = locs.filter(l => (l.concurrence||[]).includes('Expresso')).length;
   const wl = locs.filter(l => l.louma).length;
@@ -1570,7 +1614,7 @@ function renderReport() {
     </div>
     <div class="sec-t" style="margin-bottom:8px">Détail Localités</div>
     ${sorted.map(loc => {
-      const rc = migrateRec(loc.recommendation);
+      const rc = migrateRec(loc.recommendation, loc.status);
       const recLabel = RL[rc] || rc;
       return `<div class="rli">
         <div class="rli-top">
@@ -2027,12 +2071,14 @@ function mapStatus(v) {
 }
 function mapRec(v) {
   const s = normCol(v || '');
+  if (!s || s === 'non_evalue') return 'non_evalue';
   if (s.includes('macro') || s.includes('nouveau') || s.includes('new') || s.includes('creer')) return 'ok_macro';
   if (s.includes('serenguetti') || s.includes('serengetti') || s.includes('serengueti')) return 'ok_serenguetti';
   if (s.includes('optim') || s.includes('antenn') || s.includes('tilt') || s.includes('azimut')) return 'nok_optim';
-  if (s.includes('potentiel') || s.includes('potential')) return 'nok_nopotentiel';
-  if (s.includes('couverte') || s.includes('covered') || s.includes('ok')) return 'nok_covered';
-  return 'nok_covered';
+  if (s.includes('pas_de') || s.includes('potentiel') && s.includes('pas')) return 'nok_nopotentiel';
+  if (s.includes('deja') || s.includes('couverte') || s.includes('covered')) return 'nok_covered';
+  if (s.includes('ok') || s.includes('couverture_ok')) return 'nok_covered';
+  return 'non_evalue'; // défaut neutre
 }
 function mapBool(v) {
   if (v === null || v === undefined || v === '') return false;
@@ -2447,6 +2493,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   try { await openIDB(); } catch(e) { console.warn('IDB indisponible:', e); }
 
   loadData();
+
+  // Migration données : corriger nok_covered mal attribués aux non-visités
+  const corrected = migrateRecData();
+  if (corrected > 0) toast(`✓ ${corrected} préconisation(s) corrigée(s)`);
   initMap();
   refreshMap();
   updHdr();
