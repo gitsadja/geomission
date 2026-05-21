@@ -323,27 +323,34 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* MAP FILTER BAR */
-.map-filter-bar{position:absolute;bottom:calc(76px + var(--safe-b));left:0;right:0;
-  z-index:400;padding:0 10px 8px;pointer-events:none;}
-.map-filter-scroll{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:4px 2px;pointer-events:all;}
-.map-filter-scroll::-webkit-scrollbar{display:none;}
-.mfchip{padding:5px 11px;border-radius:20px;font-size:11px;font-family:'JetBrains Mono',monospace;
-  border:none;background:rgba(255,255,255,.92);color:var(--tx2);cursor:pointer;
-  white-space:nowrap;flex-shrink:0;box-shadow:0 1px 6px rgba(0,0,0,.18);
-  transition:all .15s;font-weight:600;}
-.mfchip.active{color:white;box-shadow:0 2px 8px rgba(0,0,0,.25);}
-.mfchip[data-mf="all"].active{background:var(--brand);}
-.mfchip[data-mf="pending"].active{background:#8a8f9e;}
-.mfchip[data-mf="priority"].active{background:#e53935;}
-.mfchip[data-mf="visiting"].active{background:#FF6600;}
-.mfchip[data-mf="visited"].active{background:#2e7d32;}
-.mfchip[data-mf="introuvable"].active{background:#4a4f5c;}
-.mfchip[data-mf="extra"].active{background:#f59e0b;}
-.mfchip[data-mf="ok_macro"].active{background:#e53935;}
-.mfchip[data-mf="ok_serenguetti"].active{background:#7b1fa2;}
-.mfchip[data-mf="ok_voisin"].active{background:#0277bd;}
-.mfchip[data-mf="nok_optim"].active{background:#1565c0;}
+/* MAP FILTER BUTTON + PANEL */
+.map-filter-btn{position:absolute;bottom:calc(142px + var(--safe-b));left:14px;
+  width:42px;height:42px;background:white;color:var(--brand);border:2px solid var(--brand);
+  border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--sh);cursor:pointer;z-index:400;transition:all .15s;}
+.map-filter-btn:active{background:var(--brand-lt);}
+.map-filter-btn.has-filter{background:var(--brand);color:white;}
+.map-filter-panel{position:absolute;bottom:calc(72px + var(--safe-b));left:14px;right:14px;
+  background:white;border-radius:var(--r);box-shadow:var(--sh2);z-index:401;
+  padding:14px;display:none;max-width:380px;}
+.map-filter-panel.open{display:block;}
+.mfp-title{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;
+  letter-spacing:.5px;font-family:'JetBrains Mono',monospace;margin-bottom:10px;
+  display:flex;align-items:center;justify-content:space-between;}
+.mfp-close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--tx3);padding:0;}
+.mfp-chips{display:flex;flex-wrap:wrap;gap:7px;}
+.mfp-chip{padding:7px 13px;border-radius:20px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  border:1.5px solid var(--brd);background:var(--bg2);color:var(--tx2);cursor:pointer;
+  font-weight:600;transition:all .15s;white-space:nowrap;}
+.mfp-chip.active{color:white;border-color:transparent;}
+.mfp-chip[data-mf="all"].active{background:var(--brand);}
+.mfp-chip[data-mf="visited"].active{background:#2e7d32;}
+.mfp-chip[data-mf="pending"].active{background:#8a8f9e;}
+.mfp-chip[data-mf="extra"].active{background:#f59e0b;}
+.mfp-chip[data-mf="ok_macro"].active{background:#e53935;}
+.mfp-chip[data-mf="ok_serenguetti"].active{background:#7b1fa2;}
+.mfp-chip[data-mf="ok_voisin"].active{background:#0277bd;}
+.mfp-chip[data-mf="nok_optim"].active{background:#1565c0;}
 .map-search-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);
   z-index:400;width:calc(100% - 120px);max-width:340px;}
 .map-search-input{width:100%;padding:9px 14px 9px 36px;border-radius:25px;border:none;
@@ -510,22 +517,24 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div>Visitée</div>
     </div>
     <button class="fab-gps" onclick="goMyLoc()" title="Ma position">🎯</button>
+    <button class="map-filter-btn" id="map-filter-btn" onclick="toggleMapFilterPanel()" title="Filtres carte">⚙️</button>
     <button class="fab" onclick="openAdd()" title="Ajouter">+</button>
 
-    <!-- FILTRES CARTE -->
-    <div class="map-filter-bar">
-      <div class="map-filter-scroll">
-        <button class="mfchip active" data-mf="all"          onclick="setMapFilter(this)">Toutes</button>
-        <button class="mfchip"        data-mf="pending"       onclick="setMapFilter(this)">À visiter</button>
-        <button class="mfchip"        data-mf="priority"      onclick="setMapFilter(this)">⚡ Prioritaires</button>
-        <button class="mfchip"        data-mf="visiting"      onclick="setMapFilter(this)">En cours</button>
-        <button class="mfchip"        data-mf="visited"       onclick="setMapFilter(this)">✓ Visitées</button>
-        <button class="mfchip"        data-mf="introuvable"   onclick="setMapFilter(this)">✗ Introuvable</button>
-        <button class="mfchip"        data-mf="extra"         onclick="setMapFilter(this)">⭐ Hors planning</button>
-        <button class="mfchip"        data-mf="ok_macro"      onclick="setMapFilter(this)">🏗️ Site Macro</button>
-        <button class="mfchip"        data-mf="ok_serenguetti" onclick="setMapFilter(this)">📶 Sérénguetti</button>
-        <button class="mfchip"        data-mf="ok_voisin"     onclick="setMapFilter(this)">🔗 Site voisin</button>
-        <button class="mfchip"        data-mf="nok_optim"     onclick="setMapFilter(this)">📡 Optim.</button>
+    <!-- PANNEAU FILTRES CARTE -->
+    <div class="map-filter-panel" id="map-filter-panel">
+      <div class="mfp-title">
+        <span>Filtrer les marqueurs</span>
+        <button class="mfp-close" onclick="toggleMapFilterPanel()">✕</button>
+      </div>
+      <div class="mfp-chips">
+        <button class="mfp-chip active" data-mf="all"           onclick="setMapFilter(this)">Toutes</button>
+        <button class="mfp-chip"        data-mf="visited"        onclick="setMapFilter(this)">✓ Visitées</button>
+        <button class="mfp-chip"        data-mf="pending"        onclick="setMapFilter(this)">À visiter</button>
+        <button class="mfp-chip"        data-mf="extra"          onclick="setMapFilter(this)">⭐ Hors planning</button>
+        <button class="mfp-chip"        data-mf="ok_macro"       onclick="setMapFilter(this)">🏗️ Site Macro</button>
+        <button class="mfp-chip"        data-mf="ok_serenguetti" onclick="setMapFilter(this)">📶 Sérénguetti</button>
+        <button class="mfp-chip"        data-mf="ok_voisin"      onclick="setMapFilter(this)">🔗 Site voisin</button>
+        <button class="mfp-chip"        data-mf="nok_optim"      onclick="setMapFilter(this)">📡 Optim.</button>
       </div>
     </div>
   </div>
@@ -1170,6 +1179,8 @@ function initMap() {
   // Double-tap = ajouter à cet endroit
   let lastTap = 0;
   map.on('click', e => {
+    // Fermer le panneau filtre si ouvert
+    document.getElementById('map-filter-panel')?.classList.remove('open');
     const now = Date.now();
     if (now - lastTap < 380) openAdd(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
     lastTap = now;
@@ -1195,10 +1206,20 @@ function mkIcon(status, isExtra) {
 
 let curMapFilter = 'all';
 
+function toggleMapFilterPanel() {
+  const panel = document.getElementById('map-filter-panel');
+  panel.classList.toggle('open');
+}
+
 function setMapFilter(el) {
-  document.querySelectorAll('.mfchip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.mfp-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   curMapFilter = el.dataset.mf;
+  // Icône du bouton : plein si filtre actif
+  const btn = document.getElementById('map-filter-btn');
+  if (btn) btn.classList.toggle('has-filter', curMapFilter !== 'all');
+  // Fermer le panneau après sélection
+  document.getElementById('map-filter-panel').classList.remove('open');
   refreshMap();
 }
 
