@@ -167,10 +167,27 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .stg .ts-priority.active{background:var(--rp);border-color:var(--rp);}
 .stg .ts-visiting.active{background:var(--vp);border-color:var(--vp);}
 .stg .ts-visited.active{background:var(--dp);border-color:var(--dp);}
-.rtg .tr-none.active{background:var(--rok);border-color:var(--rok);}
-.rtg .tr-optim.active{background:var(--ro);border-color:var(--ro);}
-.rtg .tr-new_site.active{background:var(--rn);border-color:var(--rn);}
-.rtg .tr-serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;}
+.stg .ts-introuvable.active{background:#4a4f5c;border-color:#4a4f5c;}
+/* Rec niveau 1 */
+.rec-ok.active{background:#2e7d32;color:white;border-color:#2e7d32;}
+.rec-nok.active{background:#e53935;color:white;border-color:#e53935;}
+/* Rec niveau 2 OK */
+.tr-ok_macro.active{background:#e53935;border-color:#e53935;color:white;}
+.tr-ok_serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;color:white;}
+/* Rec niveau 2 NOK */
+.tr-nok_optim.active{background:#1565c0;border-color:#1565c0;color:white;}
+.tr-nok_nopotentiel.active{background:#555;border-color:#555;color:white;}
+.tr-nok_covered.active{background:#2e7d32;border-color:#2e7d32;color:white;}
+/* Concurrence */
+.conc-btn.active{background:#FF6600;border-color:#FF6600;color:white;}
+.conc-none.active{background:#8a8f9e;border-color:#8a8f9e;color:white;}
+/* Badges liste */
+.rb-ok_macro{background:#fdecea;color:#e53935;}
+.rb-ok_serenguetti{background:#f3e5f5;color:#7b1fa2;}
+.rb-nok_optim{background:#e3f0fb;color:#1565c0;}
+.rb-nok_nopotentiel{background:#f0f1f3;color:#555;}
+.rb-nok_covered{background:#e8f5e9;color:#2e7d32;}
+.rb-introuvable{background:#f0f1f3;color:#4a4f5c;}
 .gps-row{display:flex;gap:7px;}
 .gps-row .fi{flex:1;}
 .gbtn{padding:9px 13px;background:var(--brand);color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;flex-shrink:0;transition:background .12s;}
@@ -427,10 +444,11 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div class="fchip" data-f="priority" onclick="setFilter(this)">Prioritaires</div>
         <div class="fchip" data-f="visiting" onclick="setFilter(this)">En cours</div>
         <div class="fchip" data-f="visited" onclick="setFilter(this)">Visitées</div>
+        <div class="fchip" data-f="introuvable" onclick="setFilter(this)">✗ Introuvable</div>
         <div class="fchip" data-f="extra" onclick="setFilter(this)">⭐ Hors planning</div>
-        <div class="fchip" data-f="new_site" onclick="setFilter(this)">Nouveau site</div>
-        <div class="fchip" data-f="serenguetti" onclick="setFilter(this)">Sérénguetti</div>
-        <div class="fchip" data-f="optim" onclick="setFilter(this)">Optim.</div>
+        <div class="fchip" data-f="ok_macro" onclick="setFilter(this)">🏗️ Site Macro</div>
+        <div class="fchip" data-f="ok_serenguetti" onclick="setFilter(this)">📶 Sérénguetti</div>
+        <div class="fchip" data-f="nok_optim" onclick="setFilter(this)">📡 Optim.</div>
       </div>
     </div>
     <div class="llist" id="llist"></div>
@@ -466,11 +484,21 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   <div class="mbody">
     <input type="hidden" id="eid">
 
+    <!-- 1. NOM + HORS PLANNING -->
     <div class="fg">
       <label class="flbl">Nom de la localité *</label>
-      <input type="text" class="fi" id="fn" placeholder="Ex: Keur Moussa, Thiamène…">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="text" class="fi" id="fn" placeholder="Ex: Keur Moussa…" style="flex:1">
+        <div id="extra-toggle" onclick="toggleExtra()" title="Hors planning"
+          style="flex-shrink:0;width:38px;height:38px;border-radius:8px;border:1.5px solid var(--brd);
+          background:var(--bg2);display:flex;align-items:center;justify-content:center;
+          font-size:18px;cursor:pointer;transition:all .15s;">⭐</div>
+      </div>
+      <div id="extra-label" style="display:none;font-size:11px;color:#92400e;font-family:'JetBrains Mono',monospace;
+        margin-top:4px;background:#fff8e1;padding:3px 8px;border-radius:4px;">⭐ Localité hors planning</div>
     </div>
 
+    <!-- 2. GPS -->
     <div class="fg">
       <label class="flbl">Coordonnées GPS</label>
       <div class="gps-row">
@@ -480,6 +508,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       </div>
     </div>
 
+    <!-- 3. STATUT -->
     <div class="fg">
       <label class="flbl">Statut de visite</label>
       <div class="tgrp stg">
@@ -487,83 +516,121 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         <div class="tbtn ts-priority" data-s="priority" onclick="selS(this)">Prioritaire</div>
         <div class="tbtn ts-visiting" data-s="visiting" onclick="selS(this)">En cours</div>
         <div class="tbtn ts-visited" data-s="visited" onclick="selS(this)">Visitée ✓</div>
+        <div class="tbtn ts-introuvable" data-s="introuvable" onclick="selS(this)">Introuvable ✗</div>
       </div>
     </div>
 
-    <div class="frow">
-      <div class="fg">
-        <label class="flbl">Population estimée</label>
-        <input type="number" class="fi" id="fpop" placeholder="Habitants">
-      </div>
-      <div class="fg">
-        <label class="flbl">Louma (jour)</label>
-        <select class="fsel" id="flouma">
-          <option value="">— Aucun —</option>
-          <option>Lundi</option><option>Mardi</option><option>Mercredi</option>
-          <option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option>
-        </select>
-      </div>
-    </div>
+    <!-- SECTION DÉTAIL — masquée si Introuvable -->
+    <div id="form-detail">
 
-    <div class="frow">
-      <div class="fg">
-        <label class="flbl">Marché permanent</label>
-        <select class="fsel" id="fmkt"><option value="0">Non</option><option value="1">Oui ✅</option></select>
+      <!-- 4+5. POPULATION + LOUMA -->
+      <div class="frow">
+        <div class="fg">
+          <label class="flbl">Population estimée</label>
+          <input type="number" class="fi" id="fpop" placeholder="Habitants">
+        </div>
+        <div class="fg">
+          <label class="flbl">Louma (jour)</label>
+          <select class="fsel" id="flouma">
+            <option value="">— Aucun —</option>
+            <option>Lundi</option><option>Mardi</option><option>Mercredi</option>
+            <option>Jeudi</option><option>Vendredi</option><option>Samedi</option><option>Dimanche</option>
+          </select>
+        </div>
       </div>
-      <div class="fg">
-        <label class="flbl">Axe routier</label>
-        <select class="fsel" id="froad"><option value="0">Non</option><option value="1">Oui ✅</option></select>
-      </div>
-    </div>
 
+      <!-- 6+7. MARCHÉ + AXE -->
+      <div class="frow">
+        <div class="fg">
+          <label class="flbl">Marché permanent</label>
+          <select class="fsel" id="fmkt"><option value="0">Non</option><option value="1">Oui ✅</option></select>
+        </div>
+        <div class="fg">
+          <label class="flbl">Axe routier</label>
+          <select class="fsel" id="froad"><option value="0">Non</option><option value="1">Oui ✅</option></select>
+        </div>
+      </div>
+
+      <!-- 8. ACTIVITÉS -->
+      <div class="fg">
+        <label class="flbl">Activités économiques</label>
+        <input type="text" class="fi" id="feco" placeholder="Agriculture, Pêche, Commerce, Élevage…">
+      </div>
+
+      <!-- 9. POTENTIEL -->
+      <div class="frow">
+        <div class="fg">
+          <label class="flbl">Potentiel estimé</label>
+          <select class="fsel" id="fpot">
+            <option value="">— Non évalué —</option>
+            <option>Faible</option><option>Moyen</option><option>Fort</option><option>Très fort</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="flbl">Abonnés estimés</label>
+          <input type="number" class="fi" id="fsubs" placeholder="Nb abonnés">
+        </div>
+      </div>
+
+      <!-- 10+11+12. SIGNAL + SITE + DISTANCE -->
+      <div class="fg">
+        <label class="flbl">Site de couverture le plus proche</label>
+        <input type="text" class="fi" id="fsite" placeholder="Nom du site RAN (ex: SITE_BAMBEY_1)">
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label class="flbl">Distance (km)</label>
+          <input type="number" class="fi" id="fdist" placeholder="km" step="0.1">
+        </div>
+        <div class="fg">
+          <label class="flbl">Qualité signal</label>
+          <select class="fsel" id="fsig">
+            <option value="">—</option>
+            <option>Bon</option><option>Moyen</option><option>Faible</option><option>Aucun</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 13. PRÉCONISATION 2 NIVEAUX -->
+      <div class="fg">
+        <label class="flbl">Préconisation couverture</label>
+        <!-- Niveau 1 : OK / NOK -->
+        <div class="tgrp" style="margin-bottom:7px;">
+          <div class="tbtn rec-ok active" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
+          <div class="tbtn rec-nok" data-rl="nok" onclick="selRecL1(this)" style="flex:1">❌ NOK</div>
+        </div>
+        <!-- Niveau 2 : sous-options OK -->
+        <div id="rec-ok-sub" class="tgrp">
+          <div class="tbtn tr-ok_macro active" data-r="ok_macro" onclick="selR(this)">🏗️ Site Macro</div>
+          <div class="tbtn tr-ok_serenguetti" data-r="ok_serenguetti" onclick="selR(this)">📶 Sérénguetti</div>
+        </div>
+        <!-- Niveau 2 : sous-options NOK -->
+        <div id="rec-nok-sub" class="tgrp" style="display:none">
+          <div class="tbtn tr-nok_optim" data-r="nok_optim" onclick="selR(this)">📡 Optimisation</div>
+          <div class="tbtn tr-nok_nopotentiel" data-r="nok_nopotentiel" onclick="selR(this)">🚫 Pas de potentiel</div>
+          <div class="tbtn tr-nok_covered" data-r="nok_covered" onclick="selR(this)">✅ Déjà couverte</div>
+        </div>
+      </div>
+
+      <!-- 14. CONCURRENCE -->
+      <div class="fg">
+        <label class="flbl">Concurrence présente</label>
+        <div class="tgrp">
+          <div class="tbtn conc-btn" data-c="Yass" onclick="toggleConc(this)">📱 Yass</div>
+          <div class="tbtn conc-btn" data-c="Expresso" onclick="toggleConc(this)">📡 Expresso</div>
+          <div class="tbtn conc-btn conc-none" data-c="none" onclick="toggleConc(this)">Aucune</div>
+        </div>
+      </div>
+
+    </div><!-- /form-detail -->
+
+    <!-- 15. NOTES (toujours visible) -->
     <div class="fg">
-      <label class="flbl">Activités économiques</label>
-      <input type="text" class="fi" id="feco" placeholder="Agriculture, Pêche, Commerce, Élevage…">
+      <label class="flbl">Observations terrain</label>
+      <textarea class="fta" id="fnotes" placeholder="Observations, contacts locaux, points remarquables…"></textarea>
     </div>
 
-    <div class="frow">
-      <div class="fg">
-        <label class="flbl">Potentiel estimé</label>
-        <select class="fsel" id="fpot">
-          <option value="">— Non évalué —</option>
-          <option>Faible</option><option>Moyen</option><option>Fort</option><option>Très fort</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label class="flbl">Pop. abonnés estimée</label>
-        <input type="number" class="fi" id="fsubs" placeholder="Nb abonnés">
-      </div>
-    </div>
-
-    <div class="fg">
-      <label class="flbl">Site de couverture le plus proche</label>
-      <input type="text" class="fi" id="fsite" placeholder="Nom du site RAN (ex: SITE_BAMBEY_1)">
-    </div>
-
-    <div class="frow">
-      <div class="fg">
-        <label class="flbl">Distance site (km)</label>
-        <input type="number" class="fi" id="fdist" placeholder="km" step="0.1">
-      </div>
-      <div class="fg">
-        <label class="flbl">Qualité signal</label>
-        <select class="fsel" id="fsig">
-          <option value="">—</option>
-          <option>Bon</option><option>Moyen</option><option>Faible</option><option>Aucun</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="fg">
-      <label class="flbl">Préconisation couverture</label>
-      <div class="tgrp rtg">
-        <div class="tbtn tr-none active" data-r="none" onclick="selR(this)">✅ OK</div>
-        <div class="tbtn tr-optim" data-r="optim" onclick="selR(this)">📡 Optimisation</div>
-        <div class="tbtn tr-serenguetti" data-r="serenguetti" onclick="selR(this)">📶 Sérénguetti</div>
-        <div class="tbtn tr-new_site" data-r="new_site" onclick="selR(this)">🏗️ Nouveau site</div>
-      </div>
-    </div>
-
+    <!-- 16. DATE (toujours visible) -->
     <div class="fg">
       <label class="flbl">Date de visite</label>
       <input type="date" class="fi" id="fvisitdate">
@@ -572,20 +639,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       </div>
     </div>
 
-    <div class="extra-toggle" id="extra-toggle" onclick="toggleExtra()">
-      <div class="extra-toggle-icon">⭐</div>
-      <div class="extra-toggle-txt">
-        <div class="extra-toggle-lbl">Localité hors planning</div>
-        <div class="extra-toggle-sub">Découverte sur le terrain, non planifiée initialement</div>
-      </div>
-      <div class="extra-switch"></div>
-    </div>
-
-    <div class="fg">
-      <label class="flbl">Notes / Observations terrain</label>
-      <textarea class="fta" id="fnotes" placeholder="Observations, contacts locaux, points remarquables, accès route…"></textarea>
-    </div>
-
+    <!-- PHOTOS (toujours visible) -->
     <div class="fg">
       <label class="flbl">Photos (max 3)</label>
       <div class="pgrid" id="pgrid">
@@ -746,10 +800,31 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 // ═══════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════
-const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓'};
-const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32'};
-const RL = {none:'Couverture OK',optim:'Optimisation antennaire',serenguetti:'Site Sérénguetti',new_site:'Nouveau site requis'};
-const RC = {none:'#2e7d32',optim:'#1565c0',serenguetti:'#7b1fa2',new_site:'#e53935'};
+const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓',introuvable:'Introuvable ✗'};
+const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32',introuvable:'#4a4f5c'};
+const RL = {
+  ok_macro:          '🏗️ Site Macro',
+  ok_serenguetti:    '📶 Sérénguetti',
+  nok_optim:         '📡 Optimisation',
+  nok_nopotentiel:   '🚫 Pas de potentiel',
+  nok_covered:       '✅ Déjà couverte',
+  // legacy
+  none:'✅ Déjà couverte', optim:'📡 Optimisation',
+  serenguetti:'📶 Sérénguetti', new_site:'🏗️ Site Macro'
+};
+const RC = {
+  ok_macro:'#e53935', ok_serenguetti:'#7b1fa2',
+  nok_optim:'#1565c0', nok_nopotentiel:'#555', nok_covered:'#2e7d32',
+  none:'#2e7d32', optim:'#1565c0', serenguetti:'#7b1fa2', new_site:'#e53935'
+};
+// Normalise les anciens codes vers les nouveaux
+function migrateRec(r) {
+  if (!r || r === 'none')        return 'nok_covered';
+  if (r === 'new_site')          return 'ok_macro';
+  if (r === 'serenguetti')       return 'ok_serenguetti';
+  if (r === 'optim')             return 'nok_optim';
+  return r; // déjà nouveau code
+}
 const SORT_ORD = {priority:0,pending:1,visiting:2,visited:3};
 
 // ═══════════════════════════════════════════════
@@ -760,8 +835,10 @@ let map = null;
 let mkrs = {};
 let curFilter = 'all';
 let cSt = 'pending';
-let cRec = 'none';
+let cRec = 'ok_macro';
+let cRecL1 = 'ok';   // niveau 1 : 'ok' | 'nok'
 let cExtra = false;
+let cConc = [];      // tableau : ['Yass','Expresso'] ou []
 let pendPh = [];
 let editPh = [];
 let tmToast = null;
@@ -947,7 +1024,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'none'; pendPh = []; editPh = []; cExtra = false;
+  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; cExtra = false; cConc = [];
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -960,7 +1037,11 @@ function openAdd(lat, lng) {
   document.getElementById('fsig').value = '';
   document.getElementById('fpot').value = '';
   document.getElementById('fvisitdate').value = '';
-  document.getElementById('extra-toggle').classList.remove('on');
+  document.getElementById('extra-toggle').style.background = 'var(--bg2)';
+  document.getElementById('extra-toggle').style.borderColor = 'var(--brd)';
+  document.getElementById('extra-label').style.display = 'none';
+  document.getElementById('form-detail').style.display = 'block';
+  resetFormToggles();
   resetTg();
   renderPGrid([]);
   openOv('add-ov');
@@ -969,7 +1050,11 @@ function openAdd(lat, lng) {
 async function openEdit(id) {
   const loc = locs.find(l => l.id === id);
   if (!loc) return;
-  cSt = loc.status; cRec = loc.recommendation || 'none';
+  cSt = loc.status;
+  const rawRec = migrateRec(loc.recommendation);
+  cRec = rawRec;
+  cRecL1 = rawRec.startsWith('ok') ? 'ok' : 'nok';
+  cConc = loc.concurrence || [];
   document.getElementById('eid').value = loc.id;
   document.getElementById('add-ttl').textContent = 'Modifier Localité';
   document.getElementById('del-btn').style.display = 'block';
@@ -991,7 +1076,12 @@ async function openEdit(id) {
   document.getElementById('fvisitdate').value = loc.visitedAt
     ? new Date(loc.visitedAt).toISOString().slice(0, 10) : '';
   cExtra = !!loc.isExtra;
-  document.getElementById('extra-toggle').classList.toggle('on', cExtra);
+  const et = document.getElementById('extra-toggle');
+  et.style.background = cExtra ? '#fff8e1' : 'var(--bg2)';
+  et.style.borderColor = cExtra ? '#f59e0b' : 'var(--brd)';
+  document.getElementById('extra-label').style.display = cExtra ? 'block' : 'none';
+  document.getElementById('form-detail').style.display = cSt === 'introuvable' ? 'none' : 'block';
+  resetFormToggles();
   resetTg();
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
@@ -1002,29 +1092,75 @@ async function openEdit(id) {
   openOv('add-ov');
 }
 
-function resetTg() {
-  document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === 'pending'));
-  document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === 'none'));
+function resetFormToggles() {
+  // Statut
+  document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
+  // Rec niveau 1
+  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
+  // Rec niveau 2
+  document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'  ? 'flex' : 'none';
+  document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok' ? 'flex' : 'none';
+  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
+  // Concurrence
+  document.querySelectorAll('.conc-btn').forEach(b => {
+    b.classList.toggle('active', cConc.includes(b.dataset.c));
+  });
 }
 
 function selS(el) {
   cSt = el.dataset.s;
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  // Auto-remplir la date de visite quand on passe à "Visitée"
-  const dateField = document.getElementById('fvisitdate');
-  if (cSt === 'visited' && dateField && !dateField.value) {
-    dateField.value = new Date().toISOString().slice(0, 10);
-  }
+  // Masquer/afficher le détail si Introuvable
+  document.getElementById('form-detail').style.display = cSt === 'introuvable' ? 'none' : 'block';
+  // Auto-date si Visitée
+  const df = document.getElementById('fvisitdate');
+  if (cSt === 'visited' && !df.value) df.value = new Date().toISOString().slice(0,10);
 }
+
+function selRecL1(el) {
+  cRecL1 = el.dataset.rl;
+  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'  ? 'flex' : 'none';
+  document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok' ? 'flex' : 'none';
+  // Sélectionner la première sous-option par défaut
+  cRec = cRecL1 === 'ok' ? 'ok_macro' : 'nok_optim';
+  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
+}
+
 function selR(el) {
   cRec = el.dataset.r;
-  document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('[data-r]').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
 }
+
+function toggleConc(el) {
+  const v = el.dataset.c;
+  if (v === 'none') {
+    cConc = [];
+    document.querySelectorAll('.conc-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    return;
+  }
+  // Désactiver "Aucune" si on sélectionne un opérateur
+  document.querySelector('.conc-none').classList.remove('active');
+  cConc = cConc.filter(c => c !== 'none');
+  if (cConc.includes(v)) {
+    cConc = cConc.filter(c => c !== v);
+    el.classList.remove('active');
+  } else {
+    cConc.push(v);
+    el.classList.add('active');
+  }
+}
+
 function toggleExtra() {
   cExtra = !cExtra;
-  document.getElementById('extra-toggle').classList.toggle('on', cExtra);
+  const et = document.getElementById('extra-toggle');
+  et.style.background   = cExtra ? '#fff8e1' : 'var(--bg2)';
+  et.style.borderColor  = cExtra ? '#f59e0b' : 'var(--brd)';
+  document.getElementById('extra-label').style.display = cExtra ? 'block' : 'none';
 }
 
 function renderPGrid(photos) {
@@ -1077,7 +1213,8 @@ async function saveLoc() {
     id, name,
     lat: parseFloat(document.getElementById('flat').value) || null,
     lng: parseFloat(document.getElementById('flng').value) || null,
-    status: cSt, recommendation: cRec,
+    status: cSt, recommendation: migrateRec(cRec),
+    concurrence: [...cConc],
     population: document.getElementById('fpop').value || null,
     subs: document.getElementById('fsubs').value || null,
     louma: document.getElementById('flouma').value || null,
@@ -1145,8 +1282,15 @@ async function openDet(id) {
   const loc = locs.find(l => l.id === id); if (!loc) return;
   const phs = [];
   for (let i = 0; i < (loc.photoCount || 0); i++) { const p = await loadPh(id, i); if (p) phs.push(p); }
-  const rc = loc.recommendation || 'none';
-  const reI = { optim: '📡', new_site: '🏗️', serenguetti: '📶', none: '✅' }[rc];
+  const rc = migrateRec(loc.recommendation || 'nok_covered');
+  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '📋';
+  const recDesc = {
+    ok_macro:        'Potentiel justifiant un nouveau site Macro complet',
+    ok_serenguetti:  'Potentiel moyen — site Sérénguetti (couverture/capacité réduites)',
+    nok_optim:       'Ajustement tilt, azimut ou puissance sur site existant',
+    nok_nopotentiel: 'Potentiel insuffisant — aucun déploiement recommandé',
+    nok_covered:     'Zone déjà bien couverte par Orange — aucune action requise'
+  }[rc] || '';
   const sc = SC[loc.status];
   const isV = loc.status === 'visited';
   const potColor = { 'Très fort': '#FF6600', 'Fort': '#FF6600', 'Moyen': '#1565c0', 'Faible': '#8a8f9e' }[loc.potential] || 'var(--tx)';
@@ -1187,18 +1331,20 @@ async function openDet(id) {
         ? `<div class="cov-box"><div style="font-size:26px">📡</div><div><div class="cov-site">${loc.nearestSite}</div><div class="cov-dist">${loc.distanceToSite ? loc.distanceToSite + ' km' : ''}${loc.signalQuality ? ' · Signal: ' + loc.signalQuality : ''}</div></div></div>`
         : `<p style="font-size:12px;color:var(--tx3);font-family:'JetBrains Mono',monospace">Site non renseigné</p>`
       }
-      <div class="rec-box ${rc}">
+      <div class="rec-box ${rc.startsWith('ok') ? 'new_site' : rc === 'nok_optim' ? 'optim' : 'none'}">
         <div style="font-size:22px">${reI}</div>
         <div>
-          <div class="rec-txt" style="color:${RC[rc]}">${RL[rc]}</div>
-          <div class="rec-sub">${
-            rc === 'optim' ? 'Tilt, puissance ou azimut à optimiser sur le site existant' :
-            rc === 'serenguetti' ? 'Potentiel moyen — déploiement d\'un site Sérénguetti (couverture et capacité réduites)' :
-            rc === 'new_site' ? 'Potentiel justifiant la création d\'un nouveau site de couverture' :
-            'Aucune action réseau requise — couverture satisfaisante'
-          }</div>
+          <div class="rec-txt" style="color:${RC[rc]||'#555'}">${RL[rc]||rc}</div>
+          <div class="rec-sub">${recDesc}</div>
         </div>
       </div>
+    </div>
+    ${(loc.concurrence||[]).length ? `<div class="det-sec">
+      <div class="det-st">Concurrence</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">${(loc.concurrence||[]).map(c =>
+        `<span style="background:#fff3eb;color:#FF6600;border:1px solid #FF6600;border-radius:6px;padding:4px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:700">${c}</span>`
+      ).join('')}</div>
+    </div>` : ''}
     </div>
     ${loc.notes ? `<div class="det-sec"><div class="det-st">Notes & Observations</div><div class="det-notes">${loc.notes}</div></div>` : ''}
     ${phs.length > 0 ? `<div class="det-sec"><div class="det-st">Photos (${phs.length})</div>
@@ -1241,10 +1387,14 @@ function renderList() {
       (loc.nearestSite || '').toLowerCase().includes(q) ||
       (loc.notes || '').toLowerCase().includes(q);
     let mf = true;
-    if (curFilter === 'extra') mf = !!loc.isExtra;
-    else if (curFilter === 'new_site') mf = loc.recommendation === 'new_site';
-    else if (curFilter === 'serenguetti') mf = loc.recommendation === 'serenguetti';
-    else if (curFilter === 'optim') mf = loc.recommendation === 'optim';
+    if (curFilter === 'introuvable') mf = loc.status === 'introuvable';
+    else if (curFilter === 'extra') mf = !!loc.isExtra;
+    else if (curFilter === 'ok_macro') mf = migrateRec(loc.recommendation) === 'ok_macro';
+    else if (curFilter === 'ok_serenguetti') mf = migrateRec(loc.recommendation) === 'ok_serenguetti';
+    else if (curFilter === 'nok_optim') mf = migrateRec(loc.recommendation) === 'nok_optim';
+    else if (curFilter === 'new_site') mf = migrateRec(loc.recommendation) === 'ok_macro';
+    else if (curFilter === 'serenguetti') mf = migrateRec(loc.recommendation) === 'ok_serenguetti';
+    else if (curFilter === 'optim') mf = migrateRec(loc.recommendation) === 'nok_optim';
     else if (curFilter !== 'all') mf = loc.status === curFilter;
     return ms && mf;
   }).sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
@@ -1261,8 +1411,9 @@ function renderList() {
       <div class="lcard-top">
         <div class="sdot" style="background:${SC[loc.status]}"></div>
         <div class="lcard-name">${loc.name}</div>
-        ${loc.isExtra ? `<span class="hp-badge">⭐ Hors planning</span>` : ''}
-        ${rc !== 'none' ? `<span class="rbadge rb-${rc}">${rc === 'optim' ? 'Optim.' : rc === 'serenguetti' ? 'Sérénguetti' : 'Nv. site'}</span>` : ''}
+        ${loc.isExtra ? `<span class="hp-badge">⭐</span>` : ''}
+        ${loc.status === 'introuvable' ? `<span class="rbadge rb-introuvable">✗ Introuvable</span>` : ''}
+        ${rc && rc !== 'nok_covered' && rc !== 'nok_nopotentiel' ? `<span class="rbadge rb-${rc}">${(RL[rc]||rc).replace(/^[^\s]+ /,'')}</span>` : ''}
       </div>
       <div class="lcard-meta">
         ${loc.population ? `<span class="mchip">👥 ${Number(loc.population).toLocaleString()}</span>` : ''}
@@ -1282,13 +1433,16 @@ function renderList() {
 // ═══════════════════════════════════════════════
 function renderReport() {
   const total = locs.length;
-  const vis = locs.filter(l => l.status === 'visited').length;
+  const vis   = locs.filter(l => l.status === 'visited').length;
   const extra = locs.filter(l => l.isExtra).length;
-  const pri = locs.filter(l => l.status === 'priority').length;
-  const pend = locs.filter(l => l.status === 'pending').length;
-  const ns = locs.filter(l => l.recommendation === 'new_site').length;
-  const sr = locs.filter(l => l.recommendation === 'serenguetti').length;
-  const op = locs.filter(l => l.recommendation === 'optim').length;
+  const intro = locs.filter(l => l.status === 'introuvable').length;
+  const pri   = locs.filter(l => l.status === 'priority').length;
+  const pend  = locs.filter(l => l.status === 'pending').length;
+  const ns    = locs.filter(l => migrateRec(l.recommendation) === 'ok_macro').length;
+  const sr    = locs.filter(l => migrateRec(l.recommendation) === 'ok_serenguetti').length;
+  const op    = locs.filter(l => migrateRec(l.recommendation) === 'nok_optim').length;
+  const concYass     = locs.filter(l => (l.concurrence||[]).includes('Yass')).length;
+  const concExpresso = locs.filter(l => (l.concurrence||[]).includes('Expresso')).length;
   const wl = locs.filter(l => l.louma).length;
   const wm = locs.filter(l => l.hasMarket).length;
   const pct = total ? Math.round(vis / total * 100) : 0;
@@ -1299,7 +1453,7 @@ function renderReport() {
     <div class="rp-hdr">
       <h2>📊 Rapport de Mission</h2>
       <p>Évaluation Potentiel Rural · ${now}</p>
-      <div class="rp-pct">${vis}/${total} localités visitées (${pct}%)${extra ? ` · dont <strong>${extra} hors planning ⭐</strong>` : ''}</div>
+      <div class="rp-pct">${vis}/${total} visitées (${pct}%)${extra ? ` · dont <strong>${extra} hors planning ⭐</strong>` : ''}${intro ? ` · <strong>${intro} introuvable(s) ✗</strong>` : ''}</div>
     </div>
     <div class="sgrid">
       <div class="scard brand"><div class="sv">${total}</div><div class="sl">Total localités</div></div>
@@ -1309,13 +1463,19 @@ function renderReport() {
     </div>
     <div class="sec-t" style="margin-bottom:8px">Recommandations Couverture</div>
     <div class="sgrid" style="margin-bottom:6px">
-      <div class="scard" style="border-color:#e53935"><div class="sv" style="color:#e53935">${ns}</div><div class="sl">Nouveaux sites requis</div></div>
+      <div class="scard" style="border-color:#e53935"><div class="sv" style="color:#e53935">${ns}</div><div class="sl">Sites Macro</div></div>
       <div class="scard" style="border-color:#7b1fa2"><div class="sv" style="color:#7b1fa2">${sr}</div><div class="sl">Sites Sérénguetti</div></div>
     </div>
     <div class="sgrid" style="margin-bottom:14px">
-      <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations antennaires</div></div>
-      <div class="scard green"><div class="sv">${locs.filter(l=>!l.recommendation||l.recommendation==='none').length}</div><div class="sl">Couverture OK</div></div>
+      <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations</div></div>
+      <div class="scard"><div class="sv">${intro}</div><div class="sl">Introuvables</div></div>
     </div>
+    ${concYass || concExpresso ? `
+    <div class="sec-t" style="margin-bottom:8px">Concurrence détectée</div>
+    <div class="sgrid" style="margin-bottom:14px">
+      <div class="scard"><div class="sv">${concYass}</div><div class="sl">Présence Yass</div></div>
+      <div class="scard"><div class="sv">${concExpresso}</div><div class="sl">Présence Expresso</div></div>
+    </div>` : ''}
     <div class="sec-t" style="margin-bottom:8px">Potentiel Économique</div>
     <div class="sgrid" style="margin-bottom:14px">
       <div class="scard"><div class="sv">${wm}</div><div class="sl">Avec marché permanent</div></div>
@@ -1323,8 +1483,8 @@ function renderReport() {
     </div>
     <div class="sec-t" style="margin-bottom:8px">Détail Localités</div>
     ${sorted.map(loc => {
-      const rc = loc.recommendation || 'none';
-      const recLabel = rc === 'new_site' ? '🏗️ Nouveau site' : rc === 'serenguetti' ? '📶 Sérénguetti' : rc === 'optim' ? '📡 Optimisation' : '✅ Couverture OK';
+      const rc = migrateRec(loc.recommendation);
+      const recLabel = RL[rc] || rc;
       return `<div class="rli">
         <div class="rli-top">
           <div class="sdot" style="background:${SC[loc.status]}"></div>
@@ -1340,6 +1500,7 @@ function renderReport() {
           ${loc.nearestSite ? `<span>📡 ${loc.nearestSite}${loc.distanceToSite ? ' (' + loc.distanceToSite + 'km)' : ''}</span>` : ''}
           ${loc.signalQuality ? `<span>📶 ${loc.signalQuality}</span>` : ''}
           ${loc.visitedAt ? `<span>🗓️ ${new Date(loc.visitedAt).toLocaleDateString('fr-FR')}</span>` : ''}
+          ${(loc.concurrence||[]).length ? `<span>🏁 Conc: ${loc.concurrence.join(', ')}</span>` : ''}
         </div>
         ${loc.economicActivities ? `<div class="rli-meta" style="margin-top:3px"><span>⚙️ ${loc.economicActivities}</span></div>` : ''}
         <span class="rli-rec rb-${rc}">${recLabel}</span>
@@ -1762,10 +1923,12 @@ function mapStatus(v) {
 }
 function mapRec(v) {
   const s = normCol(v || '');
-  if (s.includes('nouveau') || s.includes('new') || s.includes('creer') || s.includes('construire')) return 'new_site';
-  if (s.includes('serenguetti') || s.includes('serengueti') || s.includes('serengetti')) return 'serenguetti';
-  if (s.includes('optim') || s.includes('antenn') || s.includes('tilt') || s.includes('azimut') || s.includes('amelior')) return 'optim';
-  return 'none';
+  if (s.includes('macro') || s.includes('nouveau') || s.includes('new') || s.includes('creer')) return 'ok_macro';
+  if (s.includes('serenguetti') || s.includes('serengetti') || s.includes('serengueti')) return 'ok_serenguetti';
+  if (s.includes('optim') || s.includes('antenn') || s.includes('tilt') || s.includes('azimut')) return 'nok_optim';
+  if (s.includes('potentiel') || s.includes('potential')) return 'nok_nopotentiel';
+  if (s.includes('couverte') || s.includes('covered') || s.includes('ok')) return 'nok_covered';
+  return 'nok_covered';
 }
 function mapBool(v) {
   if (v === null || v === undefined || v === '') return false;
