@@ -172,7 +172,6 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 /* Rec niveau 1 */
 .rec-ok.active{background:#2e7d32;color:white;border-color:#2e7d32;}
 .rec-nok.active{background:#e53935;color:white;border-color:#e53935;}
-.rec-neval.active{background:#8a8f9e;color:white;border-color:#8a8f9e;}
 /* Rec niveau 2 OK */
 .tr-ok_macro.active{background:#e53935;border-color:#e53935;color:white;}
 .tr-ok_serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;color:white;}
@@ -184,7 +183,6 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .conc-btn.active{background:#FF6600;border-color:#FF6600;color:white;}
 .conc-none.active{background:#8a8f9e;border-color:#8a8f9e;color:white;}
 /* Badges liste */
-.rb-non_evalue{background:#f0f1f3;color:#8a8f9e;}
 .rb-ok_macro{background:#fdecea;color:#e53935;}
 .rb-ok_voisin{background:#e1f5fe;color:#0277bd;}
 .tr-ok_voisin.active{background:#0277bd;border-color:#0277bd;color:white;}
@@ -323,7 +321,36 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* MAP FILTER BUTTON + PANEL */
+/* OUTILS CARTE */
+.map-tools-btn{position:absolute;bottom:calc(196px + var(--safe-b));left:14px;
+  width:42px;height:42px;background:white;color:var(--tx);border:2px solid var(--brd);
+  border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--sh);cursor:pointer;z-index:400;transition:all .15s;}
+.map-tools-btn:active{background:var(--bg2);}
+.map-tools-btn.active-tool{background:#1a1e28;color:white;border-color:#1a1e28;}
+.map-tools-panel{position:absolute;bottom:calc(248px + var(--safe-b));left:14px;
+  background:white;border-radius:var(--r);box-shadow:var(--sh2);z-index:401;
+  padding:10px;display:none;min-width:170px;}
+.map-tools-panel.open{display:block;}
+.mtp-title{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;
+  letter-spacing:.5px;font-family:'JetBrains Mono',monospace;margin-bottom:8px;padding:0 2px;}
+.mtp-btn{width:100%;padding:9px 12px;border:none;background:none;border-radius:8px;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:8px;color:var(--tx);text-align:left;transition:background .12s;}
+.mtp-btn:hover,.mtp-btn:active{background:var(--bg2);}
+.mtp-btn.on{background:var(--brand-lt);color:var(--brand);}
+.mtp-sep{height:1px;background:var(--brd);margin:5px 0;}
+/* Mesure distance */
+.measure-tooltip{background:white!important;border:1.5px solid var(--brand)!important;
+  border-radius:6px!important;font-family:'JetBrains Mono',monospace!important;
+  font-size:12px!important;font-weight:700!important;color:var(--brand)!important;
+  padding:3px 8px!important;box-shadow:var(--sh)!important;}
+/* Trace parcours */
+.trace-info{position:absolute;top:60px;left:50%;transform:translateX(-50%);
+  background:rgba(26,30,40,.85);color:white;border-radius:20px;padding:5px 14px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;z-index:400;
+  display:none;white-space:nowrap;pointer-events:none;}
+.trace-info.show{display:block;}
 .map-filter-btn{position:absolute;bottom:calc(142px + var(--safe-b));left:14px;
   width:42px;height:42px;background:white;color:var(--brand);border:2px solid var(--brand);
   border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;
@@ -518,7 +545,29 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
     </div>
     <button class="fab-gps" onclick="goMyLoc()" title="Ma position">🎯</button>
     <button class="map-filter-btn" id="map-filter-btn" onclick="toggleMapFilterPanel()" title="Filtres carte">⚙️</button>
+    <button class="map-tools-btn"  id="map-tools-btn"  onclick="toggleToolsPanel()"      title="Outils">🛠️</button>
     <button class="fab" onclick="openAdd()" title="Ajouter">+</button>
+
+    <!-- PANNEAU OUTILS -->
+    <div class="map-tools-panel" id="map-tools-panel">
+      <div class="mtp-title">Outils carte</div>
+      <button class="mtp-btn" id="btn-compass" onclick="toggleCompass()">
+        <span>🧭</span><span>Orientation</span>
+      </button>
+      <button class="mtp-btn" id="btn-measure" onclick="toggleMeasure()">
+        <span>📏</span><span>Mesurer distance</span>
+      </button>
+      <button class="mtp-btn" id="btn-trace" onclick="toggleTrace()">
+        <span>🗺️</span><span>Trace parcours</span>
+      </button>
+      <div class="mtp-sep"></div>
+      <button class="mtp-btn" onclick="clearAllTools()" style="color:var(--tx3);font-size:12px;">
+        <span>✕</span><span>Effacer tout</span>
+      </button>
+    </div>
+
+    <!-- INFO TRACE -->
+    <div class="trace-info" id="trace-info">🗺️ Trace : <span id="trace-dist">0 km</span></div>
 
     <!-- PANNEAU FILTRES CARTE -->
     <div class="map-filter-panel" id="map-filter-panel">
@@ -700,10 +749,9 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <!-- 13. PRÉCONISATION 2 NIVEAUX -->
       <div class="fg">
         <label class="flbl">Préconisation couverture</label>
-        <!-- Niveau 1 : Non évalué / OK / NOK -->
+        <!-- Niveau 1 : OK / NOK -->
         <div class="tgrp" style="margin-bottom:7px;">
-          <div class="tbtn rec-neval" data-rl="neval" onclick="selRecL1(this)" style="flex:1">— Non évalué</div>
-          <div class="tbtn rec-ok" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
+          <div class="tbtn rec-ok active" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
           <div class="tbtn rec-nok" data-rl="nok" onclick="selRecL1(this)" style="flex:1">❌ NOK</div>
         </div>
         <!-- Niveau 2 : sous-options OK -->
@@ -979,7 +1027,6 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 const SL = {pending:'À visiter',priority:'Prioritaire',visiting:'En cours',visited:'Visitée ✓',introuvable:'Introuvable ✗'};
 const SC = {pending:'#8a8f9e',priority:'#e53935',visiting:'#FF6600',visited:'#2e7d32',introuvable:'#4a4f5c'};
 const RL = {
-  non_evalue:        '— Non évalué',
   ok_macro:          '🏗️ Site Macro',
   ok_serenguetti:    '📶 Sérénguetti',
   ok_voisin:         '🔗 Site voisin',
@@ -991,7 +1038,6 @@ const RL = {
   serenguetti:'📶 Sérénguetti', new_site:'🏗️ Site Macro'
 };
 const RC = {
-  non_evalue:'#8a8f9e',
   ok_macro:'#e53935', ok_serenguetti:'#7b1fa2', ok_voisin:'#0277bd',
   nok_optim:'#1565c0', nok_nopotentiel:'#555', nok_covered:'#2e7d32',
   none:'#2e7d32', optim:'#1565c0', serenguetti:'#7b1fa2', new_site:'#e53935'
@@ -1184,6 +1230,44 @@ function initMap() {
     );
   }
 
+  // ── Point de position en temps réel ──────────────────
+  let myLocMarker = null;
+  let myAccCircle = null;
+
+  const myLocIcon = L.divIcon({
+    html: `<div class="my-loc-icon" style="width:18px;height:18px;display:flex;
+      align-items:center;justify-content:center;transition:transform .3s;">
+      <div style="width:16px;height:16px;background:#1976d2;border-radius:50%;
+        border:3px solid white;box-shadow:0 0 0 3px rgba(25,118,210,.35),0 2px 6px rgba(0,0,0,.3);">
+      </div>
+    </div>`,
+    className: '', iconSize: [18,18], iconAnchor: [9,9]
+  });
+
+  function updateMyLoc(pos) {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const acc = pos.coords.accuracy;
+    if (myLocMarker) {
+      myLocMarker.setLatLng([lat, lng]);
+      myAccCircle.setLatLng([lat, lng]).setRadius(acc);
+    } else {
+      myAccCircle = L.circle([lat, lng], {
+        radius: acc, color: '#1976d2', fillColor: '#1976d2',
+        fillOpacity: 0.08, weight: 1, opacity: 0.3
+      }).addTo(map);
+      myLocMarker = L.marker([lat, lng], { icon: myLocIcon, zIndexOffset: 500 })
+        .addTo(map)
+        .bindTooltip('Ma position', { permanent: false });
+    }
+  }
+
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(updateMyLoc, () => {}, {
+      enableHighAccuracy: true, maximumAge: 10000, timeout: 15000
+    });
+  }
+
   // Double-tap = ajouter à cet endroit
   let lastTap = 0;
   map.on('click', e => {
@@ -1289,7 +1373,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'non_evalue'; cRecL1 = 'neval'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
+  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -1317,7 +1401,7 @@ async function openEdit(id) {
   cSt = loc.status;
   const rawRec = migrateRec(loc.recommendation, loc.status);
   cRec = rawRec;
-  cRecL1 = rawRec === 'non_evalue' ? 'neval' : rawRec.startsWith('ok') ? 'ok' : 'nok';
+  cRecL1 = rawRec.startsWith('ok') ? 'ok' : 'nok';
   cConc = loc.concurrence || [];
   document.getElementById('eid').value = loc.id;
   document.getElementById('add-ttl').textContent = 'Modifier Localité';
@@ -1365,7 +1449,7 @@ function resetFormToggles() {
   // Statut
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   // Rec niveau 1
-  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
+  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
   // Rec niveau 2
   document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'   ? 'flex' : 'none';
   document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok'  ? 'flex' : 'none';
@@ -1391,7 +1475,7 @@ function selS(el) {
 
 function selRecL1(el) {
   cRecL1 = el.dataset.rl;
-  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   const isOk  = cRecL1 === 'ok';
   const isNok = cRecL1 === 'nok';
@@ -1400,7 +1484,6 @@ function selRecL1(el) {
   // Sélectionner la première sous-option par défaut
   if (isOk)  { cRec = 'ok_macro';  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'ok_macro')); }
   if (isNok) { cRec = 'nok_optim'; document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'nok_optim')); }
-  if (cRecL1 === 'neval') { cRec = 'non_evalue'; document.querySelectorAll('[data-r]').forEach(b => b.classList.remove('active')); }
 }
 
 function selR(el) {
@@ -1618,7 +1701,7 @@ async function openDet(id) {
   const phs = [];
   for (let i = 0; i < (loc.photoCount || 0); i++) { const p = await loadPh(id, i); if (p) phs.push(p); }
   const rc = migrateRec(loc.recommendation, loc.status);
-  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', ok_voisin:'🔗', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', non_evalue:'—', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '—';
+  const reI = { ok_macro:'🏗️', ok_serenguetti:'📶', ok_voisin:'🔗', nok_optim:'📡', nok_nopotentiel:'🚫', nok_covered:'✅', none:'✅', new_site:'🏗️', serenguetti:'📶', optim:'📡' }[rc] || '—';
   const voisinInfo = rc === 'ok_voisin' && loc.siteVoisin
     ? `Site proposé sur <strong>${loc.siteVoisin}</strong>${loc.siteVoisinDist ? ' · ' + loc.siteVoisinDist + ' km' : ''}${loc.siteVoisinLat && loc.siteVoisinLng ? ` · <span style="font-family:'JetBrains Mono',monospace;font-size:11px">${Number(loc.siteVoisinLat).toFixed(5)}, ${Number(loc.siteVoisinLng).toFixed(5)}</span>` : ''}` : null;
   const recDesc = {
@@ -1628,8 +1711,7 @@ async function openDet(id) {
     nok_optim:       'Ajustement tilt, azimut ou puissance sur site existant',
     nok_nopotentiel: 'Potentiel insuffisant — aucun déploiement recommandé',
     nok_covered:     'Zone déjà bien couverte par Orange — aucune action requise',
-    non_evalue:      'Localité non encore évaluée sur le terrain'
-  }[rc] || '';
+}[rc] || '';
   const sc = SC[loc.status];
   const isV = loc.status === 'visited';
   const potColor = { 'Très fort': '#FF6600', 'Fort': '#FF6600', 'Moyen': '#1565c0', 'Faible': '#8a8f9e' }[loc.potential] || 'var(--tx)';
@@ -1765,7 +1847,7 @@ function renderList() {
         <div class="lcard-name">${loc.name}</div>
         ${loc.isExtra ? `<span class="hp-badge">⭐</span>` : ''}
         ${loc.status === 'introuvable' ? `<span class="rbadge rb-introuvable">✗ Introuvable</span>` : ''}
-        ${rc && !['nok_covered','nok_nopotentiel','non_evalue'].includes(rc) ? `<span class="rbadge rb-${rc}">${rc==='ok_macro'?'Macro':rc==='ok_serenguetti'?'Sérénguetti':rc==='ok_voisin'?'Site voisin':rc==='nok_optim'?'Optim.':''}</span>` : ''}
+        ${rc && !['nok_covered','nok_nopotentiel'].includes(rc) && rc !== 'non_evalue' ? `<span class="rbadge rb-${rc}">${rc==='ok_macro'?'Macro':rc==='ok_serenguetti'?'Sérénguetti':rc==='ok_voisin'?'Site voisin':rc==='nok_optim'?'Optim.':''}</span>` : ''}
       </div>
       <div class="lcard-meta">
         ${loc.population ? `<span class="mchip">👥 ${Number(loc.population).toLocaleString()}</span>` : ''}
@@ -2650,7 +2732,178 @@ window.addEventListener('offline', () => {
 if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
 
 // ═══════════════════════════════════════════════
-// RECHERCHE SUR LA CARTE
+// OUTILS CARTE — Orientation, Mesure, Trace
+// ═══════════════════════════════════════════════
+
+let _compassOn   = false;
+let _measureOn   = false;
+let _traceOn     = false;
+let _measurePts  = [];
+let _measureLayers = [];
+let _traceCoords = [];
+let _traceLayer  = null;
+let _traceWatch  = null;
+let _compassHeading = 0;
+
+// ── Panel outils ────────────────────────────────
+function toggleToolsPanel() {
+  document.getElementById('map-tools-panel').classList.toggle('open');
+  document.getElementById('map-filter-panel').classList.remove('open');
+}
+
+function clearAllTools() {
+  if (_compassOn)  toggleCompass();
+  if (_measureOn)  toggleMeasure();
+  if (_traceOn)    toggleTrace();
+  document.getElementById('map-tools-panel').classList.remove('open');
+}
+
+// ── 🧭 ORIENTATION ──────────────────────────────
+// Tourne le marqueur de position selon la boussole du téléphone
+function toggleCompass() {
+  _compassOn = !_compassOn;
+  document.getElementById('btn-compass').classList.toggle('on', _compassOn);
+  document.getElementById('map-tools-btn').classList.toggle('active-tool',
+    _compassOn || _measureOn || _traceOn);
+  document.getElementById('map-tools-panel').classList.remove('open');
+
+  if (_compassOn) {
+    toast('🧭 Orientation activée — pointez votre téléphone');
+    const handler = e => {
+      const h = e.webkitCompassHeading ?? e.alpha ?? 0;
+      _compassHeading = h;
+      // Mettre à jour l'icône du marqueur ma position
+      const el = document.querySelector('.my-loc-icon');
+      if (el) el.style.transform = `rotate(${h}deg)`;
+    };
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // iOS 13+
+      DeviceOrientationEvent.requestPermission().then(r => {
+        if (r === 'granted') window.addEventListener('deviceorientation', handler);
+        else toast('⚠️ Permission orientation refusée');
+      });
+    } else {
+      window.addEventListener('deviceorientation', handler);
+    }
+    window._compassHandler = handler;
+  } else {
+    if (window._compassHandler) {
+      window.removeEventListener('deviceorientation', window._compassHandler);
+      window._compassHandler = null;
+    }
+    const el = document.querySelector('.my-loc-icon');
+    if (el) el.style.transform = 'rotate(0deg)';
+  }
+}
+
+// ── 📏 MESURE DE DISTANCE ───────────────────────
+function toggleMeasure() {
+  _measureOn = !_measureOn;
+  document.getElementById('btn-measure').classList.toggle('on', _measureOn);
+  document.getElementById('map-tools-btn').classList.toggle('active-tool',
+    _compassOn || _measureOn || _traceOn);
+  document.getElementById('map-tools-panel').classList.remove('open');
+
+  if (_measureOn) {
+    _measurePts = []; _measureLayers = [];
+    toast('📏 Tapez 2 points sur la carte pour mesurer');
+    map.getContainer().style.cursor = 'crosshair';
+    map._measureHandler = e => {
+      if (!_measureOn) return;
+      _measurePts.push(e.latlng);
+
+      // Marqueur point
+      const dot = L.circleMarker(e.latlng, {
+        radius: 6, color: '#FF6600', fillColor: '#FF6600',
+        fillOpacity: 1, weight: 2
+      }).addTo(map);
+      _measureLayers.push(dot);
+
+      if (_measurePts.length === 2) {
+        // Tracer la ligne
+        const line = L.polyline(_measurePts, {
+          color: '#FF6600', weight: 2.5, dashArray: '6,4', opacity: .9
+        }).addTo(map);
+        _measureLayers.push(line);
+
+        // Calculer et afficher la distance
+        const d = haversineDist(
+          _measurePts[0].lat, _measurePts[0].lng,
+          _measurePts[1].lat, _measurePts[1].lng
+        );
+        const mid = L.latLng(
+          (_measurePts[0].lat + _measurePts[1].lat) / 2,
+          (_measurePts[0].lng + _measurePts[1].lng) / 2
+        );
+        const lbl = L.marker(mid, {
+          icon: L.divIcon({
+            html: `<div style="background:var(--brand);color:white;padding:3px 9px;
+              border-radius:12px;font-family:'JetBrains Mono',monospace;font-size:12px;
+              font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2);">
+              ${d < 1 ? Math.round(d*1000)+' m' : d.toFixed(2)+' km'}</div>`,
+            className: '', iconAnchor: [40, 12]
+          })
+        }).addTo(map);
+        _measureLayers.push(lbl);
+
+        // Réinitialiser pour nouvelle mesure
+        _measurePts = [];
+      }
+    };
+    map.on('click', map._measureHandler);
+  } else {
+    // Nettoyer
+    if (map._measureHandler) map.off('click', map._measureHandler);
+    _measureLayers.forEach(l => map.removeLayer(l));
+    _measureLayers = []; _measurePts = [];
+    map.getContainer().style.cursor = '';
+  }
+}
+
+// ── 🗺️ TRACE DU PARCOURS ────────────────────────
+function toggleTrace() {
+  _traceOn = !_traceOn;
+  document.getElementById('btn-trace').classList.toggle('on', _traceOn);
+  document.getElementById('map-tools-btn').classList.toggle('active-tool',
+    _compassOn || _measureOn || _traceOn);
+  document.getElementById('map-tools-panel').classList.remove('open');
+  const info = document.getElementById('trace-info');
+
+  if (_traceOn) {
+    _traceCoords = [];
+    toast('🗺️ Enregistrement du parcours démarré');
+    info.classList.add('show');
+    _traceLayer = L.polyline([], {
+      color: '#1565c0', weight: 3.5, opacity: .75
+    }).addTo(map);
+
+    _traceWatch = navigator.geolocation.watchPosition(pos => {
+      const pt = [pos.coords.latitude, pos.coords.longitude];
+      _traceCoords.push(pt);
+      _traceLayer.setLatLngs(_traceCoords);
+
+      // Calculer distance totale
+      if (_traceCoords.length > 1) {
+        let total = 0;
+        for (let i = 1; i < _traceCoords.length; i++) {
+          total += haversineDist(
+            _traceCoords[i-1][0], _traceCoords[i-1][1],
+            _traceCoords[i][0],   _traceCoords[i][1]
+          );
+        }
+        document.getElementById('trace-dist').textContent =
+          total < 1 ? Math.round(total*1000)+' m' : total.toFixed(2)+' km';
+      }
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 3000 });
+
+  } else {
+    if (_traceWatch) navigator.geolocation.clearWatch(_traceWatch);
+    info.classList.remove('show');
+    // Garder la trace visible, juste arrêter l'enregistrement
+    toast(`🗺️ Trace arrêtée — ${document.getElementById('trace-dist').textContent} parcourus`);
+  }
+}
 // ═══════════════════════════════════════════════
 function onMapSearch(q) {
   const clear = document.getElementById('map-srch-clear');
