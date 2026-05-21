@@ -321,7 +321,22 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* OUTILS CARTE */
+/* TRACE STATS MODAL */
+.trace-stats-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:20px;}
+.trace-stats-modal.open{display:flex;}
+.trace-stats-box{background:white;border-radius:var(--r);width:100%;max-width:340px;box-shadow:var(--sh2);overflow:hidden;}
+.tsm-hdr{background:#1565c0;color:white;padding:14px 16px;}
+.tsm-hdr h3{font-size:16px;font-weight:800;margin-bottom:2px;}
+.tsm-hdr p{font-size:11px;font-family:'JetBrains Mono',monospace;opacity:.85;}
+.tsm-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--brd);margin:0;}
+.tsm-item{background:white;padding:12px 14px;}
+.tsm-lbl{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px;}
+.tsm-val{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--tx);margin-top:2px;}
+.tsm-val.blue{color:#1565c0;}
+.tsm-btns{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--brd);}
+.tsm-btn{flex:1;padding:10px;border-radius:8px;border:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.tsm-btn.save{background:#1565c0;color:white;}
+.tsm-btn.close{background:var(--bg2);color:var(--tx);}
 .map-tools-btn{position:absolute;bottom:calc(196px + var(--safe-b));left:14px;
   width:42px;height:42px;background:white;color:var(--tx);border:2px solid var(--brd);
   border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;
@@ -995,6 +1010,28 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <button class="map-picker-confirm" id="map-picker-confirm" onclick="confirmPickerLocation()">
         ✓ Confirmer cette position
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- TRACE STATS MODAL -->
+<div class="trace-stats-modal" id="trace-stats-modal">
+  <div class="trace-stats-box">
+    <div class="tsm-hdr">
+      <h3>🗺️ Résumé du parcours</h3>
+      <p id="tsm-date">—</p>
+    </div>
+    <div class="tsm-grid">
+      <div class="tsm-item"><div class="tsm-lbl">Distance</div><div class="tsm-val blue" id="tsm-dist">—</div></div>
+      <div class="tsm-item"><div class="tsm-lbl">Durée</div><div class="tsm-val" id="tsm-dur">—</div></div>
+      <div class="tsm-item"><div class="tsm-lbl">Départ</div><div class="tsm-val" id="tsm-start">—</div></div>
+      <div class="tsm-item"><div class="tsm-lbl">Arrivée</div><div class="tsm-val" id="tsm-end">—</div></div>
+      <div class="tsm-item"><div class="tsm-lbl">Points GPS</div><div class="tsm-val" id="tsm-pts">—</div></div>
+      <div class="tsm-item"><div class="tsm-lbl">Vitesse moy.</div><div class="tsm-val" id="tsm-spd">—</div></div>
+    </div>
+    <div class="tsm-btns">
+      <button class="tsm-btn save" onclick="saveTrace()">💾 Sauvegarder</button>
+      <button class="tsm-btn close" onclick="closeTraceStats()">Fermer</button>
     </div>
   </div>
 </div>
@@ -2032,6 +2069,28 @@ function exportCSV() {
   toast('✓ CSV exporté');
 }
 
+function buildGPX(trace) {
+  const pts = trace.points.map(p =>
+    `    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"></trkpt>`
+  ).join('\n');
+  const dateStr = new Date(trace.startTime).toLocaleDateString('fr-FR');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GeoMission — Orange Sonatel"
+  xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Parcours GeoMission ${dateStr}</name>
+    <time>${trace.startTime}</time>
+    <desc>Distance: ${trace.distKm.toFixed(2)} km</desc>
+  </metadata>
+  <trk>
+    <name>Parcours ${dateStr}</name>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
 function dlBlob(content, name, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -2098,11 +2157,26 @@ async function exportZIP() {
       }
     }
 
-    // ── 4. Manifeste (pour vérification à l'import) ──
+    // ── 4. Traces GPS ──
+    try {
+      const storedTraces = JSON.parse(localStorage.getItem('gm_traces') || '[]');
+      if (storedTraces.length > 0) {
+        const traceFolder = zip.folder('traces');
+        storedTraces.forEach((tr, idx) => {
+          const date = new Date(tr.startTime).toISOString().slice(0,10);
+          // JSON
+          traceFolder.file(`parcours_${date}_${idx+1}.json`, JSON.stringify(tr, null, 2));
+          // GPX
+          const gpx = buildGPX(tr);
+          traceFolder.file(`parcours_${date}_${idx+1}.gpx`, gpx);
+        });
+      }
+    } catch(e) { console.warn('Trace export error', e); }
+    const traceCount = JSON.parse(localStorage.getItem('gm_traces')||'[]').length;
     zip.file('manifest.json', JSON.stringify({
       version: 2, app: 'GeoMission',
       exportDate: new Date().toISOString(),
-      locCount: locs.length, photoCount, videoCount
+      locCount: locs.length, photoCount, videoCount, traceCount
     }, null, 2));
 
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
@@ -2112,7 +2186,7 @@ async function exportZIP() {
     a.download = `geomission_backup_${date}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-    toast(`✓ ZIP exporté — ${locs.length} localités, ${photoCount} photos, ${videoCount} vidéo(s)`);
+    toast(`✓ ZIP exporté — ${locs.length} localités, ${photoCount} photos, ${videoCount} vidéo(s), ${traceCount} trace(s)`);
 
   } catch(e) {
     toast('⚠️ Erreur ZIP : ' + e.message);
@@ -2862,6 +2936,10 @@ function toggleMeasure() {
 }
 
 // ── 🗺️ TRACE DU PARCOURS ────────────────────────
+let _traceStartTime = null;
+let _traceEndTime   = null;
+let _traceSaved     = []; // traces sauvegardées de la session
+
 function toggleTrace() {
   _traceOn = !_traceOn;
   document.getElementById('btn-trace').classList.toggle('on', _traceOn);
@@ -2872,6 +2950,7 @@ function toggleTrace() {
 
   if (_traceOn) {
     _traceCoords = [];
+    _traceStartTime = new Date();
     toast('🗺️ Enregistrement du parcours démarré');
     info.classList.add('show');
     _traceLayer = L.polyline([], {
@@ -2882,8 +2961,6 @@ function toggleTrace() {
       const pt = [pos.coords.latitude, pos.coords.longitude];
       _traceCoords.push(pt);
       _traceLayer.setLatLngs(_traceCoords);
-
-      // Calculer distance totale
       if (_traceCoords.length > 1) {
         let total = 0;
         for (let i = 1; i < _traceCoords.length; i++) {
@@ -2899,10 +2976,71 @@ function toggleTrace() {
 
   } else {
     if (_traceWatch) navigator.geolocation.clearWatch(_traceWatch);
+    _traceEndTime = new Date();
     info.classList.remove('show');
-    // Garder la trace visible, juste arrêter l'enregistrement
-    toast(`🗺️ Trace arrêtée — ${document.getElementById('trace-dist').textContent} parcourus`);
+    if (_traceCoords.length > 1) showTraceStats();
+    else toast('🗺️ Trace arrêtée — aucun point enregistré');
   }
+}
+
+function calcTraceDist() {
+  let total = 0;
+  for (let i = 1; i < _traceCoords.length; i++) {
+    total += haversineDist(
+      _traceCoords[i-1][0], _traceCoords[i-1][1],
+      _traceCoords[i][0],   _traceCoords[i][1]
+    );
+  }
+  return total;
+}
+
+function showTraceStats() {
+  const dist = calcTraceDist();
+  const durMs = _traceEndTime - _traceStartTime;
+  const durMin = Math.round(durMs / 60000);
+  const durH = Math.floor(durMin / 60);
+  const durM = durMin % 60;
+  const durStr = durH > 0 ? `${durH}h${durM.toString().padStart(2,'0')}` : `${durM} min`;
+  const spdKmh = durMs > 0 ? (dist / (durMs / 3600000)).toFixed(1) : '—';
+  const fmt = d => d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+
+  document.getElementById('tsm-date').textContent =
+    _traceStartTime.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
+  document.getElementById('tsm-dist').textContent =
+    dist < 1 ? Math.round(dist*1000)+' m' : dist.toFixed(2)+' km';
+  document.getElementById('tsm-dur').textContent  = durStr;
+  document.getElementById('tsm-start').textContent = fmt(_traceStartTime);
+  document.getElementById('tsm-end').textContent   = fmt(_traceEndTime);
+  document.getElementById('tsm-pts').textContent   = _traceCoords.length;
+  document.getElementById('tsm-spd').textContent   = spdKmh === '—' ? '—' : spdKmh+' km/h';
+
+  document.getElementById('trace-stats-modal').classList.add('open');
+}
+
+function closeTraceStats() {
+  document.getElementById('trace-stats-modal').classList.remove('open');
+}
+
+function saveTrace() {
+  if (_traceCoords.length < 2) return;
+  const dist = calcTraceDist();
+  const trace = {
+    id: 'trace_' + Date.now(),
+    date: _traceStartTime.toISOString(),
+    startTime: _traceStartTime.toISOString(),
+    endTime: _traceEndTime.toISOString(),
+    distKm: dist,
+    points: _traceCoords
+  };
+  _traceSaved.push(trace);
+  // Persister dans localStorage
+  try {
+    const stored = JSON.parse(localStorage.getItem('gm_traces') || '[]');
+    stored.push(trace);
+    localStorage.setItem('gm_traces', JSON.stringify(stored));
+  } catch(e) { console.warn('Trace save error', e); }
+  closeTraceStats();
+  toast(`✓ Parcours sauvegardé — ${dist.toFixed(2)} km`);
 }
 // ═══════════════════════════════════════════════
 function onMapSearch(q) {
