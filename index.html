@@ -1889,7 +1889,6 @@ function goMyLoc() {
 // UTILITAIRES UI
 // ═══════════════════════════════════════════════
 function openOv(id) { document.getElementById(id).classList.add('open'); }
-function closeOv(id) { document.getElementById(id).classList.remove('open'); }
 function viewPh(src) { document.getElementById('pv-img').src = src; document.getElementById('pv').classList.add('open'); }
 function closePV() { document.getElementById('pv').classList.remove('open'); }
 
@@ -2373,12 +2372,64 @@ window.addEventListener('offline', () => {
 if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
 
 // ═══════════════════════════════════════════════
-// SERVICE WORKER
+// SERVICE WORKER — AUTO-UPDATE
 // ═══════════════════════════════════════════════
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('./sw.js').then(() => {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
     console.log('GeoMission SW enregistré');
+
+    // Écoute une nouvelle version disponible
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      newSW.addEventListener('statechange', function() {
+        // Nouveau SW prêt et un ancien SW contrôle encore la page
+        if (this.state === 'installed' && navigator.serviceWorker.controller) {
+          scheduleUpdate();
+        }
+      });
+    });
   }).catch(e => console.warn('SW non enregistré:', e));
+
+  // Quand le nouveau SW prend le contrôle → recharger la page
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!_swReloading) { _swReloading = true; location.reload(); }
+  });
+}
+
+let _swReloading = false;
+let _updatePending = false;
+
+function scheduleUpdate() {
+  // Si aucun modal ouvert → mise à jour immédiate
+  const modalsOpen = ['add-ov','det-ov','imp-ov','zip-ov'].some(id =>
+    document.getElementById(id)?.classList.contains('open')
+  );
+  if (!modalsOpen) {
+    applyUpdate();
+  } else {
+    // Reporter : attendre la fermeture du modal
+    _updatePending = true;
+    toast('🔄 Mise à jour disponible — appliquée après enregistrement');
+  }
+}
+
+function applyUpdate() {
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.waiting) {
+      reg.waiting.postMessage('SKIP_WAITING');
+    }
+  });
+}
+
+// Vérifie après fermeture d'un overlay si une mise à jour est en attente
+function closeOv(id) {
+  document.getElementById(id).classList.remove('open');
+  if (_updatePending) {
+    const modalsOpen = ['add-ov','det-ov','imp-ov','zip-ov'].some(i =>
+      document.getElementById(i)?.classList.contains('open')
+    );
+    if (!modalsOpen) { _updatePending = false; applyUpdate(); }
+  }
 }
 
 // ═══════════════════════════════════════════════

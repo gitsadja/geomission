@@ -1,4 +1,4 @@
-const CACHE = 'geomission-v9';
+const CACHE = 'geomission-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -37,4 +37,9 @@ self.addEventListener('fetch', e => {
       }).catch(() => cached);
     })
   );
+});
+
+// Reçoit l'ordre de rechargement depuis index.html
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
