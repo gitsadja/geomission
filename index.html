@@ -1168,8 +1168,16 @@ function initMap() {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(map);
 
-  // Essai position GPS
-  if (navigator.geolocation) {
+  // Centrer sur les localités existantes — sinon position GPS — sinon Sénégal
+  const withCoords = locs.filter(l => l.lat && l.lng);
+  if (withCoords.length > 0) {
+    try {
+      const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    } catch(e) {
+      map.setView([14.3, -14.5], 8);
+    }
+  } else if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       p => map.setView([p.coords.latitude, p.coords.longitude], 10),
       () => {}
