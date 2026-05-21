@@ -616,7 +616,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div class="fg">
         <label class="flbl">Concurrence présente</label>
         <div class="tgrp">
-          <div class="tbtn conc-btn" data-c="Yass" onclick="toggleConc(this)">📱 Yass</div>
+          <div class="tbtn conc-btn" data-c="Yas" onclick="toggleConc(this)">📱 Yas</div>
           <div class="tbtn conc-btn" data-c="Expresso" onclick="toggleConc(this)">📡 Expresso</div>
           <div class="tbtn conc-btn conc-none" data-c="none" onclick="toggleConc(this)">Aucune</div>
         </div>
@@ -639,13 +639,26 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       </div>
     </div>
 
-    <!-- PHOTOS (toujours visible) -->
+    <!-- PHOTOS + VIDÉO -->
     <div class="fg">
       <label class="flbl">Photos (max 3)</label>
       <div class="pgrid" id="pgrid">
         <div class="padd" onclick="document.getElementById('photo-input').click()">📷</div>
       </div>
       <input type="file" id="photo-input" accept="image/*" capture="environment" multiple onchange="handlePh(event)">
+    </div>
+
+    <div class="fg">
+      <label class="flbl">Vidéo (max 10 MB)</label>
+      <div id="vgrid" style="margin-top:6px;">
+        <div class="padd" id="vadd" onclick="document.getElementById('video-input').click()" style="width:100%;height:52px;border-radius:8px;">
+          🎥 Ajouter une vidéo
+        </div>
+      </div>
+      <input type="file" id="video-input" accept="video/*" capture="environment" onchange="handleVid(event)" style="display:none">
+      <div style="font-size:10px;color:var(--tx3);margin-top:3px;font-family:'JetBrains Mono',monospace;">
+        Formats acceptés : mp4, mov, webm · Limite : 10 MB
+      </div>
     </div>
 
     <button class="btn-save" onclick="saveLoc()">💾 Enregistrer</button>
@@ -838,9 +851,11 @@ let cSt = 'pending';
 let cRec = 'ok_macro';
 let cRecL1 = 'ok';   // niveau 1 : 'ok' | 'nok'
 let cExtra = false;
-let cConc = [];      // tableau : ['Yass','Expresso'] ou []
+let cConc = [];      // tableau : ['Yas','Expresso'] ou []
 let pendPh = [];
 let editPh = [];
+let pendVid = null;   // base64 vidéo en attente (nouveau)
+let editVid = null;   // base64 vidéo existante (édition)
 let tmToast = null;
 let deferredInstall = null;
 
@@ -1024,7 +1039,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; cExtra = false; cConc = [];
+  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -1083,10 +1098,12 @@ async function openEdit(id) {
   resetFormToggles();
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   document.querySelectorAll('.rtg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.r === cRec));
-  pendPh = []; editPh = [];
+  pendPh = []; editPh = []; pendVid = null; editVid = null;
   const n = loc.photoCount || 0;
   for (let i = 0; i < n; i++) { const p = await loadPh(loc.id, i); if (p) editPh.push(p); }
+  if (loc.hasVideo) { editVid = await loadPh(loc.id, 'vid'); }
   renderPGrid([...editPh]);
+  renderVGrid(editVid || pendVid);
   openOv('add-ov');
 }
 
@@ -1185,6 +1202,45 @@ function handlePh(e) {
   e.target.value = '';
 }
 
+function handleVid(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const MAX = 10 * 1024 * 1024; // 10 MB
+  if (f.size > MAX) {
+    toast(`⚠️ Vidéo trop lourde (${(f.size/1024/1024).toFixed(1)} MB) — max 10 MB`);
+    e.target.value = ''; return;
+  }
+  const r = new FileReader();
+  r.onload = ev => {
+    pendVid = ev.target.result;
+    editVid = null;
+    renderVGrid(pendVid);
+    toast('✓ Vidéo prête');
+  };
+  r.readAsDataURL(f);
+  e.target.value = '';
+}
+
+function renderVGrid(vidSrc) {
+  const g = document.getElementById('vgrid'); if (!g) return;
+  if (vidSrc) {
+    g.innerHTML = `
+      <div style="position:relative;width:100%;border-radius:8px;overflow:hidden;background:#000;max-height:160px;">
+        <video src="${vidSrc}" controls playsinline style="width:100%;max-height:160px;display:block;border-radius:8px;"></video>
+        <button onclick="removeVid()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);
+          color:white;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>`;
+  } else {
+    g.innerHTML = `<div class="padd" id="vadd" onclick="document.getElementById('video-input').click()"
+      style="width:100%;height:52px;border-radius:8px;">🎥 Ajouter une vidéo</div>`;
+  }
+}
+
+function removeVid() {
+  pendVid = null; editVid = null;
+  renderVGrid(null);
+}
+
 function compress(src, cb) {
   const img = new Image();
   img.onload = () => {
@@ -1226,6 +1282,7 @@ async function saveLoc() {
     notes: document.getElementById('fnotes').value || null,
     isExtra: cExtra,
     photoCount: allPh.length,
+    hasVideo: !!(pendVid || editVid),
     createdAt: isEdit ? (locs.find(l => l.id === eid)?.createdAt || Date.now()) : Date.now(),
     updatedAt: Date.now(),
     visitedAt: (() => {
@@ -1237,6 +1294,10 @@ async function saveLoc() {
   };
 
   for (let i = 0; i < allPh.length; i++) await savePh(id, i, allPh[i]);
+  // Vidéo
+  const finalVid = pendVid || editVid;
+  if (finalVid) await savePh(id, 'vid', finalVid);
+  else if (isEdit) { try { await savePh(id, 'vid', null); } catch(e) {} }
 
   if (isEdit) {
     const idx = locs.findIndex(l => l.id === eid);
@@ -1263,6 +1324,7 @@ async function doDel() {
   const eid = document.getElementById('eid').value; if (!eid) return;
   const loc = locs.find(l => l.id === eid);
   await delPhs(eid, loc?.photoCount || 0);
+  if (loc?.hasVideo) { try { await savePh(eid, 'vid', null); } catch(e) {} }
   locs = locs.filter(l => l.id !== eid);
   saveData();
   closeCd();
@@ -1348,11 +1410,23 @@ async function openDet(id) {
     ${phs.length > 0 ? `<div class="det-sec"><div class="det-st">Photos (${phs.length})</div>
       <div class="pgrid">${phs.map(p => `<img class="pthumb" src="${p}" onclick="viewPh('${p}')">`).join('')}</div>
     </div>` : ''}
+    ${loc.hasVideo ? `<div class="det-sec" id="vid-sec-${id}"><div class="det-st">Vidéo</div>
+      <div id="vid-player-${id}" style="color:var(--tx3);font-family:'JetBrains Mono',monospace;font-size:12px">⏳ Chargement…</div>
+    </div>` : ''}
     <div class="det-ts">Ajouté le ${new Date(loc.createdAt).toLocaleDateString('fr-FR')}${loc.visitedAt ? ' · Visité le ' + new Date(loc.visitedAt).toLocaleDateString('fr-FR') : ''}</div>
     <div style="height:16px"></div>
   `;
   openOv('det-ov');
   map && map.closePopup();
+  // Charger la vidéo en async après affichage
+  if (loc.hasVideo) {
+    loadPh(id, 'vid').then(vsrc => {
+      const el = document.getElementById(`vid-player-${id}`);
+      if (el && vsrc) el.innerHTML = `<video src="${vsrc}" controls playsinline
+        style="width:100%;border-radius:8px;margin-top:4px;max-height:200px;"></video>`;
+      else if (el) el.textContent = '⚠️ Vidéo introuvable';
+    });
+  }
 }
 
 function qVisit(id) {
@@ -1420,6 +1494,7 @@ function renderList() {
         ${loc.potential ? `<span class="mchip">⚡ ${loc.potential}</span>` : ''}
         ${loc.nearestSite ? `<span class="mchip">📡 ${loc.nearestSite}${loc.distanceToSite ? ' ' + loc.distanceToSite + 'km' : ''}</span>` : ''}
         ${loc.photoCount ? `<span class="mchip">📷 ${loc.photoCount}</span>` : ''}
+        ${loc.hasVideo ? `<span class="mchip">🎥 Vidéo</span>` : ''}
       </div>
       ${loc.notes ? `<div class="lcard-note">${loc.notes}</div>` : ''}
     </div>`;
@@ -1439,7 +1514,7 @@ function renderReport() {
   const ns    = locs.filter(l => migrateRec(l.recommendation) === 'ok_macro').length;
   const sr    = locs.filter(l => migrateRec(l.recommendation) === 'ok_serenguetti').length;
   const op    = locs.filter(l => migrateRec(l.recommendation) === 'nok_optim').length;
-  const concYass     = locs.filter(l => (l.concurrence||[]).includes('Yass')).length;
+  const concYas     = locs.filter(l => (l.concurrence||[]).includes('Yas')).length;
   const concExpresso = locs.filter(l => (l.concurrence||[]).includes('Expresso')).length;
   const wl = locs.filter(l => l.louma).length;
   const wm = locs.filter(l => l.hasMarket).length;
@@ -1468,10 +1543,10 @@ function renderReport() {
       <div class="scard blue"><div class="sv">${op}</div><div class="sl">Optimisations</div></div>
       <div class="scard"><div class="sv">${intro}</div><div class="sl">Introuvables</div></div>
     </div>
-    ${concYass || concExpresso ? `
+    ${concYas || concExpresso ? `
     <div class="sec-t" style="margin-bottom:8px">Concurrence détectée</div>
     <div class="sgrid" style="margin-bottom:14px">
-      <div class="scard"><div class="sv">${concYass}</div><div class="sl">Présence Yass</div></div>
+      <div class="scard"><div class="sv">${concYas}</div><div class="sl">Présence Yas</div></div>
       <div class="scard"><div class="sv">${concExpresso}</div><div class="sl">Présence Expresso</div></div>
     </div>` : ''}
     <div class="sec-t" style="margin-bottom:8px">Potentiel Économique</div>
@@ -1630,32 +1705,39 @@ async function exportZIP() {
     ].map(v=>`"${v}"`).join(','));
     zip.file('rapport.csv', '\uFEFF' + [hdr.join(','), ...rows].join('\n'));
 
-    // ── 3. Photos ──
+    // ── 3. Photos + Vidéos ──
     const photoFolder = zip.folder('photos');
-    let photoCount = 0;
+    let photoCount = 0, videoCount = 0;
     for (const loc of locs) {
       const n = loc.photoCount || 0;
+      const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
       for (let i = 0; i < n; i++) {
         const b64 = await loadPh(loc.id, i);
         if (!b64) continue;
-        // Extraire la partie base64 pure (sans le préfixe data:image/jpeg;base64,)
         const match = b64.match(/^data:([^;]+);base64,(.+)$/);
         if (!match) continue;
         const ext = match[1].split('/')[1] || 'jpg';
-        const data = match[2];
-        const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
-        photoFolder.file(`${safeName}_${i+1}.${ext}`, data, { base64: true });
+        photoFolder.file(`${safeName}_${i+1}.${ext}`, match[2], { base64: true });
         photoCount++;
+      }
+      if (loc.hasVideo) {
+        const vb64 = await loadPh(loc.id, 'vid');
+        if (vb64) {
+          const vm = vb64.match(/^data:([^;]+);base64,(.+)$/);
+          if (vm) {
+            const ext = vm[1].split('/')[1] || 'mp4';
+            photoFolder.file(`${safeName}_video.${ext}`, vm[2], { base64: true });
+            videoCount++;
+          }
+        }
       }
     }
 
     // ── 4. Manifeste (pour vérification à l'import) ──
     zip.file('manifest.json', JSON.stringify({
-      version: 2,
-      app: 'GeoMission',
+      version: 2, app: 'GeoMission',
       exportDate: new Date().toISOString(),
-      locCount: locs.length,
-      photoCount
+      locCount: locs.length, photoCount, videoCount
     }, null, 2));
 
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
@@ -1665,7 +1747,7 @@ async function exportZIP() {
     a.download = `geomission_backup_${date}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-    toast(`✓ ZIP exporté — ${locs.length} localités, ${photoCount} photos`);
+    toast(`✓ ZIP exporté — ${locs.length} localités, ${photoCount} photos, ${videoCount} vidéo(s)`);
 
   } catch(e) {
     toast('⚠️ Erreur ZIP : ' + e.message);
@@ -1735,6 +1817,17 @@ async function restoreFromZip(file) {
         const ext = photoFile.name.endsWith('.png') ? 'png' : 'jpeg';
         await savePh(loc.id, i, `data:image/${ext};base64,${b64data}`);
         photoRestored++;
+      }
+      // Restaurer la vidéo
+      if (loc.hasVideo) {
+        const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
+        const vf = ['mp4','mov','webm','avi'].reduce((found, ext) =>
+          found || photoFolder.file(`${safeName}_video.${ext}`), null);
+        if (vf) {
+          const vdata = await vf.async('base64');
+          const ext = vf.name.split('.').pop();
+          await savePh(loc.id, 'vid', `data:video/${ext};base64,${vdata}`);
+        }
       }
     }
 
