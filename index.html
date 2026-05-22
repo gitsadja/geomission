@@ -336,8 +336,8 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .dup-choice{padding:5px 10px;border-radius:6px;border:1.5px solid var(--brd);
   background:white;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;
   font-weight:600;transition:all .12s;}
-.dup-choice.active-ign{background:#8a8f9e;color:white;border-color:#8a8f9e;}
-.dup-choice.active-upd{background:#1565c0;color:white;border-color:#1565c0;}
+.dup-choice.active-ignore{background:#8a8f9e;color:white;border-color:#8a8f9e;}
+.dup-choice.active-update{background:#1565c0;color:white;border-color:#1565c0;}
 .dup-choice.active-add{background:#2e7d32;color:white;border-color:#2e7d32;}
 
 /* MISSION MODAL */
@@ -533,10 +533,10 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   padding:6px 10px;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;
   display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;}
 .imp-hdr-btn:active{background:rgba(255,255,255,.35);}
-.imp-hdr-btn .btn-label{display:inline;}
-@media (max-width: 420px) {
-  .imp-hdr-btn .btn-label{display:none;}
-  .imp-hdr-btn{padding:6px 8px;font-size:16px;}
+.imp-hdr-btn .btn-label{display:none;} /* masqué par défaut sur mobile */
+@media (min-width: 480px) {
+  .imp-hdr-btn .btn-label{display:inline;} /* visible sur écrans larges */
+  .imp-hdr-btn{font-size:12px;}
 }
 .warn-box{background:#fff8e1;border:1.5px solid #ffca28;border-radius:8px;padding:9px 12px;
   font-size:12px;color:#5d4037;margin-bottom:12px;font-family:'JetBrains Mono',monospace;line-height:1.5;}
@@ -2514,7 +2514,9 @@ function renderDupSection(dups) {
 function setDupChoice(rowIndex, choice, el) {
   _dupChoices[rowIndex] = choice;
   const item = el.closest('.dup-item');
-  item.querySelectorAll('.dup-choice').forEach(b => b.className = 'dup-choice');
+  item.querySelectorAll('.dup-choice').forEach(b => {
+    b.className = 'dup-choice';
+  });
   el.classList.add('active-' + choice);
 }
 
