@@ -2479,7 +2479,7 @@ function detectDuplicates(rows) {
     if (existing) {
       dups.push({ rowIndex: i, name: String(row[nameIdx]), type: 'base',
         existingName: existing.name, existingId: existing.id });
-      _dupChoices[i] = 'update'; // défaut : mettre à jour
+      _dupChoices[i] = 'ignore'; // défaut : ignorer
     }
   });
 
