@@ -580,9 +580,6 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   <div class="hchips">
     <button class="imp-hdr-btn" onclick="openImport()">📂<span class="btn-label"> Importer</span></button>
     <button class="imp-hdr-btn" onclick="openNewMission()" style="background:rgba(255,255,255,.15);">🚩<span class="btn-label"> Mission</span></button>
-    <div class="hchip g">✓<span id="ct-v">0</span></div>
-    <div class="hchip">📍<span id="ct-t">0</span></div>
-    <div class="hchip r">⚡<span id="ct-p">0</span></div>
   </div>
 </header>
 
@@ -2422,13 +2419,20 @@ function toast(msg) {
 }
 
 function updHdr() {
-  document.getElementById('ct-t').textContent = locs.length;
-  document.getElementById('ct-v').textContent = locs.filter(l => l.status === 'visited').length;
-  document.getElementById('ct-p').textContent = locs.filter(l => l.status === 'priority').length;
+  const total   = locs.length;
+  const visited = locs.filter(l => l.status === 'visited').length;
   const pending = locs.filter(l => l.status === 'pending' || l.status === 'priority').length;
-  document.getElementById('hdr-sub').textContent =
-    locs.length === 0 ? 'Évaluation Potentiel Rural' :
-    `${locs.filter(l => l.status === 'visited').length}/${locs.length} visitées · ${pending} restantes`;
+  const sub = document.getElementById('hdr-sub');
+  if (!sub) return;
+  if (!total) {
+    sub.innerHTML = _currentMission
+      ? `<span class="hdr-mission">🚩 ${_currentMission.name}</span>`
+      : 'Évaluation Potentiel Rural';
+  } else {
+    const missionBadge = _currentMission
+      ? `<span class="hdr-mission">🚩 ${_currentMission.name}</span> · ` : '';
+    sub.innerHTML = `${missionBadge}✓${visited}/${total} · ${pending} restantes`;
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -2535,11 +2539,7 @@ function loadMission() {
 }
 
 function updateMissionDisplay() {
-  const nameEl = document.getElementById('hdr-sub');
-  if (_currentMission && nameEl) {
-    nameEl.innerHTML = `Évaluation Potentiel Rural<br>
-      <span class="hdr-mission">🚩 ${_currentMission.name}</span>`;
-  }
+  updHdr();
 }
 
 function getMissions() {
