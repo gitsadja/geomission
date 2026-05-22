@@ -321,7 +321,53 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .empty-t{font-size:17px;font-weight:700;}
 .empty-s{font-size:13px;color:var(--tx3);margin-top:5px;line-height:1.6;}
 
-/* TRACE STATS MODAL */
+/* DOUBLONS IMPORT */
+.dup-section{background:#fff8e1;border:1.5px solid #f59e0b;border-radius:8px;
+  padding:10px 12px;margin-bottom:12px;}
+.dup-section-t{font-size:11px;font-weight:700;color:#92400e;font-family:'JetBrains Mono',monospace;
+  margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.dup-item{background:white;border-radius:6px;padding:8px 10px;margin-bottom:6px;
+  border:1px solid #fde68a;}
+.dup-item:last-child{margin-bottom:0;}
+.dup-name{font-size:13px;font-weight:700;margin-bottom:6px;}
+.dup-type{font-size:10px;font-family:'JetBrains Mono',monospace;color:#92400e;
+  background:#fef3c7;padding:2px 6px;border-radius:3px;margin-left:5px;}
+.dup-choices{display:flex;gap:5px;flex-wrap:wrap;}
+.dup-choice{padding:5px 10px;border-radius:6px;border:1.5px solid var(--brd);
+  background:white;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;
+  font-weight:600;transition:all .12s;}
+.dup-choice.active-ign{background:#8a8f9e;color:white;border-color:#8a8f9e;}
+.dup-choice.active-upd{background:#1565c0;color:white;border-color:#1565c0;}
+.dup-choice.active-add{background:#2e7d32;color:white;border-color:#2e7d32;}
+
+/* MISSION MODAL */
+.mission-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;
+  display:none;align-items:center;justify-content:center;padding:20px;}
+.mission-modal.open{display:flex;}
+.mission-box{background:white;border-radius:var(--r);width:100%;max-width:340px;
+  box-shadow:var(--sh2);overflow:hidden;}
+.mission-hdr{background:var(--brand);color:white;padding:14px 16px;}
+.mission-hdr h3{font-size:16px;font-weight:800;}
+.mission-hdr p{font-size:11px;font-family:'JetBrains Mono',monospace;opacity:.85;margin-top:3px;}
+.mission-body{padding:16px;}
+.mission-list{max-height:200px;overflow-y:auto;margin-bottom:14px;}
+.mission-item{display:flex;align-items:center;gap:8px;padding:9px 10px;
+  border-radius:8px;background:var(--bg2);margin-bottom:6px;cursor:pointer;transition:background .12s;}
+.mission-item:active{background:var(--brand-lt);}
+.mission-item-name{font-size:13px;font-weight:700;flex:1;}
+.mission-item-meta{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--tx3);}
+.mission-sep{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;
+  letter-spacing:.5px;font-family:'JetBrains Mono',monospace;margin-bottom:8px;}
+.mission-btn{width:100%;padding:11px;border-radius:8px;border:none;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;}
+.mission-btn.new{background:var(--brand);color:white;}
+.mission-btn.cancel{background:var(--bg2);color:var(--tx);}
+
+/* NOM MISSION dans header */
+.hdr-mission{font-size:9px;font-family:'JetBrains Mono',monospace;
+  background:rgba(255,255,255,.2);border-radius:4px;padding:1px 6px;
+  margin-top:2px;display:inline-block;max-width:140px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
 .trace-stats-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:20px;}
 .trace-stats-modal.open{display:flex;}
 .trace-stats-box{background:white;border-radius:var(--r);width:100%;max-width:340px;box-shadow:var(--sh2);overflow:hidden;}
@@ -528,6 +574,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
   </div>
   <div class="hchips">
     <button class="imp-hdr-btn" onclick="openImport()">📂 Importer</button>
+    <button class="imp-hdr-btn" onclick="openNewMission()" style="background:rgba(255,255,255,.15);">🚩 Mission</button>
     <div class="hchip g">✓<span id="ct-v">0</span></div>
     <div class="hchip">📍<span id="ct-t">0</span></div>
     <div class="hchip r">⚡<span id="ct-p">0</span></div>
@@ -928,6 +975,15 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <div class="imp-section-t">Correspondance des colonnes</div>
       <div class="col-map-grid" id="col-map-grid"></div>
 
+      <!-- DOUBLONS -->
+      <div id="dup-section" style="display:none">
+        <div class="imp-section-t">⚠️ Doublons détectés</div>
+        <div class="dup-section">
+          <div class="dup-section-t">⚠️ <span id="dup-count">0</span> doublon(s) — choisissez l'action</div>
+          <div id="dup-list"></div>
+        </div>
+      </div>
+
       <div class="imp-section-t">Aperçu (5 premières lignes)</div>
       <div class="prev-wrap"><table class="prev-table" id="prev-table"></table></div>
 
@@ -1032,6 +1088,35 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
     <div class="tsm-btns">
       <button class="tsm-btn save" onclick="saveTrace()">💾 Sauvegarder</button>
       <button class="tsm-btn close" onclick="closeTraceStats()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MISSION MODAL -->
+<div class="mission-modal" id="mission-modal">
+  <div class="mission-box">
+    <div class="mission-hdr">
+      <h3>🚩 Gestion des missions</h3>
+      <p id="mission-current-lbl">Mission courante : <span id="mission-current-name">—</span></p>
+    </div>
+    <div class="mission-body">
+      <div class="mission-sep">Missions archivées</div>
+      <div class="mission-list" id="mission-list">
+        <div style="font-size:12px;color:var(--tx3);font-family:'JetBrains Mono',monospace;
+          text-align:center;padding:12px;">Aucune mission archivée</div>
+      </div>
+      <div class="mission-sep">Nouvelle mission</div>
+      <div class="fg">
+        <label class="flbl">Nom de la nouvelle mission</label>
+        <input type="text" class="fi" id="new-mission-name"
+          placeholder="Ex: Mission Niayes J3, Casamance Mai 2026…">
+      </div>
+      <button class="mission-btn new" onclick="startNewMission()">
+        🚩 Archiver &amp; Démarrer nouvelle mission
+      </button>
+      <button class="mission-btn cancel" onclick="closeMissionModal()" style="margin-top:7px;">
+        Annuler
+      </button>
     </div>
   </div>
 </div>
@@ -2342,7 +2427,222 @@ function updHdr() {
 }
 
 // ═══════════════════════════════════════════════
-// IMPORT EXCEL / CSV
+// DÉTECTION DOUBLONS À L'IMPORT
+// ═══════════════════════════════════════════════
+
+let _dupChoices = {}; // { rowIndex: 'ignore'|'update'|'add' }
+
+// Normalise un nom pour comparaison doublons
+function normName(n) {
+  return String(n||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\s_\-\.]+/g,'').trim();
+}
+
+function detectDuplicates(rows) {
+  _dupChoices = {};
+  const dups = [];
+
+  // Cas 1 — doublons dans le fichier importé
+  const seenInFile = new Map(); // normName → first rowIndex
+  rows.forEach((row, i) => {
+    const nameIdx = impMapping['name'];
+    if (nameIdx < 0) return;
+    const n = normName(row[nameIdx]);
+    if (!n) return;
+    if (seenInFile.has(n)) {
+      dups.push({ rowIndex: i, name: String(row[nameIdx]), type: 'file',
+        existingName: String(rows[seenInFile.get(n)][nameIdx]) });
+      _dupChoices[i] = 'ignore'; // défaut : ignorer
+    } else {
+      seenInFile.set(n, i);
+    }
+  });
+
+  // Cas 2 — doublon avec base existante
+  rows.forEach((row, i) => {
+    if (_dupChoices[i] !== undefined) return; // déjà en doublon fichier
+    const nameIdx = impMapping['name'];
+    if (nameIdx < 0) return;
+    const n = normName(row[nameIdx]);
+    if (!n) return;
+    const existing = locs.find(l => normName(l.name) === n);
+    if (existing) {
+      dups.push({ rowIndex: i, name: String(row[nameIdx]), type: 'base',
+        existingName: existing.name, existingId: existing.id });
+      _dupChoices[i] = 'update'; // défaut : mettre à jour
+    }
+  });
+
+  return dups;
+}
+
+function renderDupSection(dups) {
+  const sec = document.getElementById('dup-section');
+  const list = document.getElementById('dup-list');
+  if (!dups.length) { sec.style.display = 'none'; return; }
+
+  document.getElementById('dup-count').textContent = dups.length;
+  sec.style.display = 'block';
+
+  list.innerHTML = dups.map(d => {
+    const label = d.type === 'file'
+      ? `<span class="dup-type">Dans le fichier</span>`
+      : `<span class="dup-type">Déjà en base</span>`;
+    const choices = d.type === 'file'
+      ? [['ignore','Ignorer'],['add','Garder les deux']]
+      : [['update','Mettre à jour'],['ignore','Ignorer'],['add','Garder les deux']];
+    const btns = choices.map(([v,l]) =>
+      `<button class="dup-choice ${_dupChoices[d.rowIndex]===v?'active-'+v:''}"
+        onclick="setDupChoice(${d.rowIndex},'${v}',this)">${l}</button>`
+    ).join('');
+    return `<div class="dup-item">
+      <div class="dup-name">${d.name} ${label}</div>
+      <div style="font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-bottom:5px;">
+        ${d.type==='file'?'Déjà présent dans le fichier importé':'Existe déjà : '+d.existingName}
+      </div>
+      <div class="dup-choices">${btns}</div>
+    </div>`;
+  }).join('');
+}
+
+function setDupChoice(rowIndex, choice, el) {
+  _dupChoices[rowIndex] = choice;
+  const item = el.closest('.dup-item');
+  item.querySelectorAll('.dup-choice').forEach(b => b.className = 'dup-choice');
+  el.classList.add('active-' + choice);
+}
+
+// ═══════════════════════════════════════════════
+// GESTION DES MISSIONS
+// ═══════════════════════════════════════════════
+
+let _currentMission = null; // { id, name, createdAt }
+
+function loadMission() {
+  try {
+    const m = localStorage.getItem('gm_current_mission');
+    _currentMission = m ? JSON.parse(m) : null;
+    updateMissionDisplay();
+  } catch(e) {}
+}
+
+function updateMissionDisplay() {
+  const nameEl = document.getElementById('hdr-sub');
+  if (_currentMission && nameEl) {
+    nameEl.innerHTML = `Évaluation Potentiel Rural<br>
+      <span class="hdr-mission">🚩 ${_currentMission.name}</span>`;
+  }
+}
+
+function getMissions() {
+  try { return JSON.parse(localStorage.getItem('gm_missions') || '[]'); }
+  catch(e) { return []; }
+}
+
+function openNewMission() {
+  const missions = getMissions();
+  const list = document.getElementById('mission-list');
+  const curName = document.getElementById('mission-current-name');
+  curName.textContent = _currentMission ? _currentMission.name : '(sans nom)';
+
+  if (missions.length) {
+    list.innerHTML = missions.slice().reverse().map(m => `
+      <div class="mission-item" onclick="restoreMission('${m.id}')">
+        <div>
+          <div class="mission-item-name">🚩 ${m.name}</div>
+          <div class="mission-item-meta">${new Date(m.archivedAt).toLocaleDateString('fr-FR')} · ${m.locCount} localités</div>
+        </div>
+        <div style="font-size:18px;color:var(--tx3)">↩️</div>
+      </div>`
+    ).join('');
+  } else {
+    list.innerHTML = '<div style="font-size:12px;color:var(--tx3);font-family:\'JetBrains Mono\',monospace;text-align:center;padding:12px;">Aucune mission archivée</div>';
+  }
+
+  document.getElementById('new-mission-name').value = '';
+  document.getElementById('mission-modal').classList.add('open');
+}
+
+function closeMissionModal() {
+  document.getElementById('mission-modal').classList.remove('open');
+}
+
+async function startNewMission() {
+  const name = document.getElementById('new-mission-name').value.trim();
+  if (!name) { toast('⚠️ Donnez un nom à la nouvelle mission'); return; }
+  if (!locs.length && !_currentMission) {
+    // Pas de données à archiver, juste nommer
+    _currentMission = { id: 'mission_' + Date.now(), name, createdAt: Date.now() };
+    localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
+    updateMissionDisplay();
+    closeMissionModal();
+    toast(`🚩 Mission "${name}" démarrée`);
+    return;
+  }
+
+  // Archiver la mission courante
+  const missionId = (_currentMission?.id) || ('mission_' + Date.now());
+  const missionName = _currentMission?.name || '(sans nom)';
+  const archive = {
+    id: missionId,
+    name: missionName,
+    createdAt: _currentMission?.createdAt || Date.now(),
+    archivedAt: Date.now(),
+    locCount: locs.length,
+    locs: JSON.parse(JSON.stringify(locs)) // copie profonde
+  };
+
+  // Sauvegarder dans les missions archivées
+  const missions = getMissions();
+  const idx = missions.findIndex(m => m.id === missionId);
+  if (idx >= 0) missions[idx] = archive; else missions.push(archive);
+  localStorage.setItem('gm_missions', JSON.stringify(missions));
+
+  // Réinitialiser les données courantes
+  locs.forEach(l => {
+    delPhs(l.id, l.photoCount || 0);
+    if (l.hasVideo) savePh(l.id, 'vid', null).catch(()=>{});
+  });
+  locs = [];
+  saveData();
+
+  // Démarrer nouvelle mission
+  _currentMission = { id: 'mission_' + Date.now(), name, createdAt: Date.now() };
+  localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
+
+  closeMissionModal();
+  refreshMap();
+  updateMissionDisplay();
+  toast(`✓ Mission archivée · 🚩 "${name}" démarrée`);
+  if (document.getElementById('list-view').classList.contains('active')) renderList();
+}
+
+async function restoreMission(missionId) {
+  const missions = getMissions();
+  const m = missions.find(x => x.id === missionId);
+  if (!m) return;
+
+  if (locs.length > 0) {
+    const ok = confirm(`Restaurer "${m.name}" ? Les données courantes (${locs.length} localités) seront archivées.`);
+    if (!ok) return;
+    // Archiver courante d'abord
+    await startNewMission(); // ne devrait pas être appelé comme ça mais on ferme juste
+  }
+
+  // Restaurer
+  locs.forEach(l => delPhs(l.id, l.photoCount || 0));
+  locs = m.locs;
+  saveData();
+  _currentMission = { id: m.id, name: m.name, createdAt: m.createdAt };
+  localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
+
+  closeMissionModal();
+  refreshMap();
+  updateMissionDisplay();
+  toast(`✓ Mission "${m.name}" restaurée — ${locs.length} localités`);
+  if (document.getElementById('list-view').classList.contains('active')) renderList();
+}
 // ═══════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════
@@ -2568,6 +2868,9 @@ function showStep2() {
   recomputeValidRows();
   renderColMapping();
   renderPreview();
+  // Détection doublons
+  const dups = detectDuplicates(impPendingRows);
+  renderDupSection(dups);
 }
 
 function recomputeValidRows() {
@@ -2712,19 +3015,49 @@ function confirmReplace() {
 
 async function executeImport(replace) {
   if (replace) { for (const l of locs) await delPhs(l.id, l.photoCount || 0); locs = []; }
-  const newLocs = impPendingRows.map(rowToLoc);
+
+  // Appliquer les choix doublons
+  const nameIdx = impMapping['name'];
+  const newLocs = [];
+  impPendingRows.forEach((row, i) => {
+    const choice = _dupChoices[i]; // undefined = pas de doublon
+    if (choice === 'ignore') return;
+
+    const obj = rowToLoc(row);
+
+    if (choice === 'update') {
+      // Remplacer les données texte de l'existant (sans photos/vidéo)
+      const n = normName(String(nameIdx >= 0 ? row[nameIdx] : ''));
+      const existing = locs.find(l => normName(l.name) === n);
+      if (existing) {
+        Object.assign(existing, {
+          ...obj, id: existing.id,
+          photoCount: existing.photoCount,
+          hasVideo: existing.hasVideo,
+          createdAt: existing.createdAt
+        });
+        return; // ne pas ajouter en double
+      }
+    }
+    newLocs.push(obj);
+  });
+
   locs = [...locs, ...newLocs];
   saveData();
   closeImp();
   refreshMap();
   const withCoords = newLocs.filter(l => l.lat && l.lng);
   if (withCoords.length && map) {
-    try {
-      const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
-      map.fitBounds(bounds, { padding: [40, 40] });
-    } catch(e) {}
+    try { map.fitBounds(L.latLngBounds(withCoords.map(l=>[l.lat,l.lng])),{padding:[40,40]}); }
+    catch(e) {}
   }
-  toast(`✓ ${newLocs.length} localités importées${replace ? ' (remplacement)' : ''}`);
+  const updated = Object.values(_dupChoices).filter(v=>v==='update').length;
+  const ignored = Object.values(_dupChoices).filter(v=>v==='ignore').length;
+  let msg = `✓ ${newLocs.length} localités importées`;
+  if (updated) msg += ` · ${updated} mises à jour`;
+  if (ignored) msg += ` · ${ignored} ignorées`;
+  msg += replace ? ' (remplacement)' : '';
+  toast(msg);
   if (document.getElementById('list-view').classList.contains('active')) renderList();
 }
 
@@ -3282,6 +3615,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   try { await openIDB(); } catch(e) { console.warn('IDB indisponible:', e); }
 
   loadData();
+  loadMission();
 
   // Migration données : corriger nok_covered mal attribués aux non-visités
   const corrected = migrateRecData();
