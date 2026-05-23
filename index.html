@@ -1145,11 +1145,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       </button>
       <button class="mission-btn" onclick="doAutoBackup(false)"
         style="background:#2e7d32;color:white;margin-top:6px;">
-        💾 Sauvegarder maintenant
-      </button>
-      <button class="mission-btn" onclick="initAutoBackupDir()"
-        style="background:var(--bg2);color:var(--tx2);margin-top:6px;font-size:12px;">
-        📁 Configurer dossier de sauvegardes auto
+        💾 Sauvegarder maintenant (Téléchargements)
       </button>
       <button class="mission-btn cancel" onclick="closeMissionModal()" style="margin-top:7px;">
         Annuler
@@ -2841,84 +2837,83 @@ function updHdr() {
 }
 
 // ═══════════════════════════════════════════════
-// SAUVEGARDES QUOTIDIENNES (File System Access API)
+// SAUVEGARDES QUOTIDIENNES → Téléchargements
 // ═══════════════════════════════════════════════
-let _fsRootHandle = null; // handle sur le dossier racine GeoMission
 
-async function initAutoBackupDir() {
-  // Demander une seule fois à l'user de choisir le dossier
-  if (!('showDirectoryPicker' in window)) return false;
-  try {
-    _fsRootHandle = await window.showDirectoryPicker({
-      id: 'geomission-backups',
-      mode: 'readwrite',
-      startIn: 'documents'
-    });
-    localStorage.setItem('gm_fs_backup_enabled', '1');
-    toast('✓ Dossier de sauvegardes configuré');
-    return true;
-  } catch(e) { return false; }
+async function buildBackupZip() {
+  const zip = new JSZip();
+  zip.file('geomission_data.json', JSON.stringify(locs, null, 2));
+  const photoFolder = zip.folder('photos');
+  let photoCount = 0;
+  for (const loc of locs) {
+    const n = loc.photoCount || 0;
+    const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
+    for (let i = 0; i < n; i++) {
+      const b64 = await loadPh(loc.id, i);
+      if (!b64) continue;
+      const match = b64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) continue;
+      const ext = match[1].split('/')[1]||'jpg';
+      photoFolder.file(`${safeName}_${i+1}.${ext}`, match[2], {base64:true});
+      photoCount++;
+    }
+    if (loc.hasVideo) {
+      const vb64 = await loadPh(loc.id, 'vid');
+      if (vb64) {
+        const vm = vb64.match(/^data:([^;]+);base64,(.+)$/);
+        if (vm) {
+          const ext = vm[1].split('/')[1]||'mp4';
+          photoFolder.file(`${safeName}_video.${ext}`, vm[2], {base64:true});
+        }
+      }
+    }
+  }
+  const missionName = (_currentMission?.name||'Mission').replace(/[^a-zA-Z0-9_\-\s]/g,'').trim().replace(/\s+/g,'_');
+  zip.file('manifest.json', JSON.stringify({
+    version:2, app:'GeoMission', mission:missionName,
+    backupDate: new Date().toISOString(),
+    locCount: locs.length, photoCount
+  }, null, 2));
+  return { zip, missionName };
 }
 
 async function doAutoBackup(silent = true) {
-  if (!_fsRootHandle) return;
+  if (!locs.length) return;
   try {
-    const missionName = (_currentMission?.name || 'Mission').replace(/[^a-zA-Z0-9_\-\s]/g,'').trim().replace(/\s+/g,'_');
+    const { zip, missionName } = await buildBackupZip();
     const today = new Date().toISOString().slice(0,10);
-
-    // Créer/ouvrir dossier GeoMission/[Nom_Mission]/
-    const appDir = await _fsRootHandle.getDirectoryHandle('GeoMission', { create:true });
-    const mDir   = await appDir.getDirectoryHandle(missionName, { create:true });
-
-    // Générer le ZIP
-    const zip = new JSZip();
-    zip.file('geomission_data.json', JSON.stringify(locs, null, 2));
-
-    // Photos
-    const photoFolder = zip.folder('photos');
-    let photoCount = 0;
-    for (const loc of locs) {
-      const n = loc.photoCount || 0;
-      const safeName = loc.name.replace(/[^a-zA-Z0-9_\-]/g,'_');
-      for (let i = 0; i < n; i++) {
-        const b64 = await loadPh(loc.id, i);
-        if (!b64) continue;
-        const match = b64.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) continue;
-        const ext = match[1].split('/')[1]||'jpg';
-        photoFolder.file(`${safeName}_${i+1}.${ext}`, match[2], { base64:true });
-        photoCount++;
-      }
-    }
-
-    zip.file('manifest.json', JSON.stringify({
-      version:2, app:'GeoMission', mission: missionName,
-      backupDate: new Date().toISOString(),
-      locCount: locs.length, photoCount
-    }, null, 2));
-
-    const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:6} });
-
-    // Écrire le fichier backup_YYYY-MM-DD.zip
-    const fname = `backup_${today}.zip`;
-    const fh = await mDir.getFileHandle(fname, { create:true });
-    const writable = await fh.createWritable();
-    await writable.write(blob);
-    await writable.close();
-
-    if (!silent) toast(`✓ Sauvegarde → GeoMission/${missionName}/${fname}`);
-    console.log(`[AutoBackup] Saved to GeoMission/${missionName}/${fname}`);
-  } catch(e) {
-    console.warn('[AutoBackup]', e);
-  }
+    const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GeoMission_${missionName}_${today}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    localStorage.setItem('gm_last_backup', new Date().toISOString());
+    if (!silent) toast(`✓ Sauvegarde → GeoMission_${missionName}_${today}.zip`);
+    else toast(`💾 Sauvegarde auto du jour téléchargée`);
+  } catch(e) { console.warn('[AutoBackup]', e); }
 }
 
-// Planifier sauvegarde automatique toutes les heures (si dossier configuré)
 function scheduleAutoBackup() {
-  if (!localStorage.getItem('gm_fs_backup_enabled')) return;
+  // Vérifier au démarrage si la sauvegarde du jour a déjà été faite
+  setTimeout(async () => {
+    const lastBackup = localStorage.getItem('gm_last_backup');
+    const today = new Date().toISOString().slice(0,10);
+    if (!lastBackup || !lastBackup.startsWith(today)) {
+      if (locs.length > 0) await doAutoBackup(true);
+    }
+  }, 5000); // 5s après le démarrage
+
+  // Ensuite toutes les heures
   setInterval(async () => {
-    if (_fsRootHandle && locs.length > 0) await doAutoBackup(true);
-  }, 60 * 60 * 1000); // toutes les heures
+    if (!locs.length) return;
+    const lastBackup = localStorage.getItem('gm_last_backup');
+    const today = new Date().toISOString().slice(0,10);
+    if (!lastBackup || !lastBackup.startsWith(today)) {
+      await doAutoBackup(true);
+    }
+  }, 60 * 60 * 1000);
 }
 // ═══════════════════════════════════════════════
 
