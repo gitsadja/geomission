@@ -294,6 +294,17 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .exp-btn:active{background:var(--brand-dk);}
 .exp-btn.sec{background:var(--bg2);color:var(--tx);margin-top:8px;}
 
+/* PPT PROGRESS */
+.ppt-progress-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;
+  display:none;align-items:center;justify-content:center;padding:24px;}
+.ppt-progress-overlay.open{display:flex;}
+.ppt-progress-box{background:white;border-radius:var(--r);width:100%;max-width:320px;padding:20px;box-shadow:var(--sh2);}
+.ppt-progress-title{font-size:15px;font-weight:800;margin-bottom:4px;}
+.ppt-progress-sub{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);margin-bottom:14px;min-height:16px;}
+.ppt-progress-track{width:100%;height:8px;background:var(--brd);border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.ppt-progress-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .3s ease;width:0%;}
+.ppt-progress-pct{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--tx3);text-align:right;}
+
 /* CONFIRM */
 .cdlg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:24px;}
 .cdlg.open{display:flex;}
@@ -1073,6 +1084,18 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         ✓ Confirmer cette position
       </button>
     </div>
+  </div>
+</div>
+
+<!-- PPT PROGRESS OVERLAY -->
+<div class="ppt-progress-overlay" id="ppt-progress-overlay">
+  <div class="ppt-progress-box">
+    <div class="ppt-progress-title">📊 Génération PowerPoint…</div>
+    <div class="ppt-progress-sub" id="ppt-progress-sub">Initialisation…</div>
+    <div class="ppt-progress-track">
+      <div class="ppt-progress-fill" id="ppt-progress-fill"></div>
+    </div>
+    <div class="ppt-progress-pct" id="ppt-progress-pct">0%</div>
   </div>
 </div>
 
@@ -2015,6 +2038,14 @@ function renderReport() {
   const sorted = [...locs].sort((a, b) => (SORT_ORD[a.status] || 0) - (SORT_ORD[b.status] || 0));
 
   document.getElementById('rpc').innerHTML = `
+    <!-- BOUTONS EXPORT EN HAUT -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      <button class="exp-btn" style="margin-top:0;font-size:12px;padding:10px 6px" onclick="exportPPT()">📊 PowerPoint</button>
+      <button class="exp-btn" style="margin-top:0;font-size:12px;padding:10px 6px;background:#1565c0" onclick="exportZIP()">🗜️ Backup ZIP</button>
+      <button class="exp-btn sec" style="margin-top:0;font-size:12px;padding:10px 6px" onclick="exportHTML()">📥 Rapport HTML</button>
+      <button class="exp-btn sec" style="margin-top:0;font-size:12px;padding:10px 6px" onclick="exportCSV()">📊 CSV</button>
+      <button class="exp-btn sec" style="margin-top:0;font-size:12px;padding:10px 6px;grid-column:1/-1" onclick="openZipImport()">📦 Restaurer depuis ZIP</button>
+    </div>
     <div class="rp-hdr">
       <h2>📊 Rapport de Mission</h2>
       <p>Évaluation Potentiel Rural · ${now}</p>
@@ -2073,11 +2104,6 @@ function renderReport() {
         ${loc.notes ? `<div class="rli-note">"${loc.notes}"</div>` : ''}
       </div>`;
     }).join('')}
-    <button class="exp-btn" onclick="exportHTML()">📥 Exporter rapport HTML</button>
-    <button class="exp-btn sec" onclick="exportCSV()">📊 Exporter CSV</button>
-    <button class="exp-btn" style="background:#c0392b" onclick="exportPPT()">📊 Générer présentation PowerPoint</button>
-    <button class="exp-btn" style="background:#1565c0" onclick="exportZIP()">🗜️ Sauvegarde complète (ZIP + photos)</button>
-    <button class="exp-btn sec" onclick="openZipImport()">📦 Restaurer depuis ZIP</button>
     <div style="height:20px"></div>
   `;
 }
@@ -2165,9 +2191,17 @@ function exportCSV() {
 // EXPORT POWERPOINT
 // ═══════════════════════════════════════════════
 
+function pptProgress(pct, msg) {
+  document.getElementById('ppt-progress-fill').style.width = pct + '%';
+  document.getElementById('ppt-progress-pct').textContent = Math.round(pct) + '%';
+  if (msg) document.getElementById('ppt-progress-sub').textContent = msg;
+}
+
 async function exportPPT() {
   if (!locs.length) { toast('⚠️ Aucune donnée à exporter'); return; }
-  toast('⏳ Génération PPT — la carte va défiler pour capturer chaque localité…');
+  // Ouvrir progress overlay
+  document.getElementById('ppt-progress-overlay').classList.add('open');
+  pptProgress(0, 'Initialisation…');
 
   try {
     const pptx = new PptxGenJS();
@@ -2209,6 +2243,8 @@ async function exportPPT() {
       if (subtitle) slide.addText(subtitle, { x:0.4, y:0.72, w:9, h:0.32, fontSize:12, color:'FFD0A8', fontFace:'Calibri' });
       slide.addText('Orange Sonatel · GeoMission', { x:8.5, y:0.72, w:3, h:0.32, fontSize:9, color:'FFD0A8', fontFace:'Calibri', align:'right' });
     };
+
+    pptProgress(10, 'Slide titre & dashboard…');
 
     // ── SLIDE 1 — Titre ───────────────────────────
     const s1 = pptx.addSlide();
@@ -2286,12 +2322,17 @@ async function exportPPT() {
         border:{pt:1, color:'E2E4E9'}, align:'center' });
     }
 
+    pptProgress(30, `${visitedLocs.length} slides à générer…`);
+
     // ── SLIDES localités visitées ─────────────────
     const visitedLocs = visited.filter(l =>
       l.notes || l.population || l.nearestSite || l.photoCount > 0
     );
 
-    for (const loc of visitedLocs) {
+    for (let _idx = 0; _idx < visitedLocs.length; _idx++) {
+      const loc = visitedLocs[_idx];
+      pptProgress(30 + Math.round(_idx / visitedLocs.length * 60),
+        `${_idx+1}/${visitedLocs.length} — ${loc.name.replace(/_/g,' ')}`);
       const sl = pptx.addSlide();
       sl.background = { color: C.white };
 
@@ -2405,6 +2446,7 @@ async function exportPPT() {
     sc.addText('Orange Sonatel · Direction Réseau · ' + today, { x:0.5, y:6.5, w:11.5, h:0.5, fontSize:12, color:'FFD0A8', fontFace:'Calibri', align:'center' });
 
     // ── Générer et télécharger ────────────────────
+    pptProgress(95, 'Finalisation du fichier…');
     // Restaurer la vue initiale de la carte
     if (map) {
       const withCoords = locs.filter(l => l.lat && l.lng);
@@ -2414,46 +2456,95 @@ async function exportPPT() {
       }
     }
     const filename = `GeoMission_${missionName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pptx`;
+    pptProgress(100, 'Téléchargement…');
     await pptx.writeFile({ fileName: filename });
+    document.getElementById('ppt-progress-overlay').classList.remove('open');
     toast(`✓ PowerPoint généré — ${visitedLocs.length + 4} slides`);
 
   } catch(e) {
+    document.getElementById('ppt-progress-overlay').classList.remove('open');
     console.error('[PPT Export]', e);
     toast('⚠️ Erreur génération PPT : ' + e.message);
   }
 }
 
-// ── Capture carte Leaflet centrée sur une localité ──────────────────
+// ── Capture carte centrée sur une localité ──────────────────────────
+// Essaie d'abord leaflet-image (carte app avec marqueurs),
+// sinon fallback sur tuiles OSM manuelles (centrage garanti)
 function getLocMapImage(lat, lng) {
   return new Promise(resolve => {
-    if (!lat || !lng || !map || typeof leafletImage === 'undefined') {
-      resolve(null); return;
-    }
-    try {
-      // Centrer la carte sur la localité
-      map.setView([parseFloat(lat), parseFloat(lng)], 14);
-      // Attendre que les tuiles chargent
-      setTimeout(() => {
-        leafletImage(map, (err, canvas) => {
-          if (err || !canvas) { resolve(null); return; }
-          // Recadrer 512×512 centré (leaflet-image retourne la taille actuelle de la carte)
-          const w = canvas.width, h = canvas.height;
-          const out = document.createElement('canvas');
-          out.width = 512; out.height = 512;
-          const ctx = out.getContext('2d');
-          // Centrer le crop sur la carte (la localité est au centre grâce à setView)
-          const sx = Math.max(0, Math.round((w - 512) / 2));
-          const sy = Math.max(0, Math.round((h - 512) / 2));
-          const sw = Math.min(512, w), sh = Math.min(512, h);
-          ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-          resolve(out.toDataURL('image/png'));
-        });
-      }, 800); // 800ms pour le chargement des tuiles
-    } catch(e) {
-      console.warn('[leafletImage]', e);
-      resolve(null);
+    if (!lat || !lng) { resolve(null); return; }
+
+    // Utiliser leaflet-image seulement si la carte est visible et disponible
+    const mapEl = document.getElementById('map');
+    const mapVisible = mapEl && mapEl.offsetParent !== null;
+
+    if (map && typeof leafletImage !== 'undefined' && mapVisible) {
+      try {
+        map.setView([parseFloat(lat), parseFloat(lng)], 14);
+        setTimeout(() => {
+          try {
+            leafletImage(map, (err, canvas) => {
+              if (err || !canvas) { getLocMapImageFallback(lat, lng).then(resolve); return; }
+              try {
+                const w = canvas.width, h = canvas.height;
+                const out = document.createElement('canvas');
+                out.width = 512; out.height = 512;
+                const ctx = out.getContext('2d');
+                const sx = Math.max(0, Math.round((w - 512) / 2));
+                const sy = Math.max(0, Math.round((h - 512) / 2));
+                ctx.drawImage(canvas, sx, sy, Math.min(512,w), Math.min(512,h), 0, 0, Math.min(512,w), Math.min(512,h));
+                resolve(out.toDataURL('image/png'));
+              } catch(e2) { getLocMapImageFallback(lat, lng).then(resolve); }
+            });
+          } catch(e) { getLocMapImageFallback(lat, lng).then(resolve); }
+        }, 800);
+      } catch(e) { getLocMapImageFallback(lat, lng).then(resolve); }
+    } else {
+      getLocMapImageFallback(lat, lng).then(resolve);
     }
   });
+}
+
+// Fallback : tuiles OSM manuelles — toujours centré sur la localité
+async function getLocMapImageFallback(lat, lng) {
+  try {
+    const zoom = 13, n = Math.pow(2, zoom);
+    const fLat = parseFloat(lat), fLng = parseFloat(lng);
+    const latRad = fLat * Math.PI / 180;
+    const tileXf = (fLng + 180) / 360 * n;
+    const tileYf = (1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n;
+    const tx = Math.floor(tileXf), ty = Math.floor(tileYf);
+    const fracX = (tileXf - tx) * 256, fracY = (tileYf - ty) * 256;
+
+    const BIG = 768, OUT = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = BIG; canvas.height = BIG;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#f0f1f3';
+    ctx.fillRect(0, 0, BIG, BIG);
+
+    const grid = [];
+    for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) grid.push([tx+dx,ty+dy,(dx+1)*256,(dy+1)*256]);
+    await Promise.all(grid.map(([x,y,ox,oy]) => new Promise(res => {
+      const img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = () => { ctx.drawImage(img, ox, oy, 256, 256); res(); };
+      img.onerror = res;
+      img.src = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+    })));
+
+    const locX = 256 + fracX, locY = 256 + fracY;
+    ctx.beginPath(); ctx.arc(locX, locY, 18, 0, Math.PI*2); ctx.fillStyle='rgba(255,102,0,0.25)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(locX, locY, 10, 0, Math.PI*2); ctx.fillStyle='#FF6600'; ctx.fill();
+    ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.stroke();
+
+    const out = document.createElement('canvas'); out.width=OUT; out.height=OUT;
+    const cx = out.getContext('2d');
+    const cropX = Math.max(0, Math.min(BIG-OUT, Math.round(locX-OUT/2)));
+    const cropY = Math.max(0, Math.min(BIG-OUT, Math.round(locY-OUT/2)));
+    cx.drawImage(canvas, cropX, cropY, OUT, OUT, 0, 0, OUT, OUT);
+    return out.toDataURL('image/png');
+  } catch(e) { console.warn('[MapFallback]', e); return null; }
 }
 
 function buildGPX(trace) {
