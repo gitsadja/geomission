@@ -22,8 +22,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- JSZip pour export/import ZIP photos -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<!-- PptxGenJS pour export PowerPoint -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundled.js"></script>
+<!-- PptxGenJS pour export PowerPoint (local) -->
+<script src="./pptxgen.bundle.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
@@ -2378,6 +2378,8 @@ async function exportPPT() {
     toast('⚠️ Erreur génération PPT : ' + e.message);
   }
 }
+
+function buildGPX(trace) {
   const pts = trace.points.map(p =>
     `    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"></trkpt>`
   ).join('\n');
