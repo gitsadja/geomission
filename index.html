@@ -2348,38 +2348,44 @@ async function exportPPT() {
         }
 
       } else {
-        // ── SANS PHOTO : layout pleine largeur centré, grands textes ──
-        const W = 11.6; // largeur totale utilisable
-        const xL = 0.5; // marge gauche
+        // ── SANS PHOTO : pleine largeur + carte OSM si coords disponibles ──
+        const W = 11.6;
+        const xL = 0.5;
+        const hasCoords = loc.lat && loc.lng;
 
-        // Infos en 2 colonnes si assez d'éléments
-        if (infoRows.length) {
-          const mid = Math.ceil(infoRows.length / 2);
-          const col1 = infoRows.slice(0, mid);
-          const col2 = infoRows.slice(mid);
-          sl.addText(col1.join('\n'), {
-            x:xL, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top'
-          });
-          if (col2.length) {
-            sl.addText(col2.join('\n'), {
-              x:6.1, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top'
+        if (hasCoords) {
+          // Layout 2 colonnes : infos + notes à gauche, carte OSM à droite
+          if (infoRows.length) {
+            sl.addText(infoRows.join('\n'), {
+              x:xL, y:1.2, w:5.5, h:2.8, fontSize:15, color:C.tx, fontFace:'Calibri', valign:'top'
             });
           }
-        }
-
-        // Séparateur
-        const sepY = infoRows.length > 0 ? 4.15 : 1.4;
-        sl.addShape(pptx.ShapeType.rect, { x:xL, y:sepY, w:W, h:0.04, fill:{color:'E2E4E9'} });
-
-        // Notes en pleine largeur
-        if (loc.notes) {
-          sl.addText('📝 Observations terrain', {
-            x:xL, y:sepY+0.15, w:W, h:0.35, fontSize:13, bold:true, color:C.tx3, fontFace:'Calibri'
-          });
-          sl.addText(loc.notes, {
-            x:xL, y:sepY+0.55, w:W, h: 7.5 - sepY - 0.55, fontSize:15,
-            color:C.tx2, fontFace:'Calibri', valign:'top', italic:true
-          });
+          if (loc.notes) {
+            sl.addShape(pptx.ShapeType.rect, { x:xL, y:4.1, w:5.5, h:0.04, fill:{color:'E2E4E9'} });
+            sl.addText('📝 Observations terrain', { x:xL, y:4.2, w:5.5, h:0.3, fontSize:10, bold:true, color:C.tx3, fontFace:'Calibri' });
+            sl.addText(loc.notes, { x:xL, y:4.55, w:5.5, h:2.2, fontSize:13, color:C.tx2, fontFace:'Calibri', valign:'top', italic:true });
+          }
+          // Carte OSM à droite
+          const mapImg = await getLocMapImage(loc.lat, loc.lng);
+          if (mapImg) {
+            sl.addImage({ data:mapImg, x:6.1, y:1.1, w:5.5, h:5.5 });
+            sl.addText('© OpenStreetMap', { x:6.1, y:6.55, w:5.5, h:0.25, fontSize:8, color:C.tx3, fontFace:'Calibri', align:'right' });
+          } else {
+            sl.addShape(pptx.ShapeType.rect, { x:6.1, y:1.1, w:5.5, h:5.5, fill:{color:'F0F1F3'} });
+            sl.addText('📍 Carte indisponible', { x:6.1, y:3.5, w:5.5, h:0.6, fontSize:13, color:C.tx3, fontFace:'Calibri', align:'center' });
+          }
+        } else {
+          // Pas de coords → pleine largeur
+          if (infoRows.length) {
+            const mid = Math.ceil(infoRows.length / 2);
+            sl.addText(infoRows.slice(0, mid).join('\n'), { x:xL, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top' });
+            if (infoRows.length > mid) sl.addText(infoRows.slice(mid).join('\n'), { x:6.1, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top' });
+          }
+          sl.addShape(pptx.ShapeType.rect, { x:xL, y:4.15, w:W, h:0.04, fill:{color:'E2E4E9'} });
+          if (loc.notes) {
+            sl.addText('📝 Observations terrain', { x:xL, y:4.3, w:W, h:0.35, fontSize:13, bold:true, color:C.tx3, fontFace:'Calibri' });
+            sl.addText(loc.notes, { x:xL, y:4.7, w:W, h:2.5, fontSize:15, color:C.tx2, fontFace:'Calibri', valign:'top', italic:true });
+          }
         }
       }
     }
@@ -2404,6 +2410,61 @@ async function exportPPT() {
   } catch(e) {
     console.error('[PPT Export]', e);
     toast('⚠️ Erreur génération PPT : ' + e.message);
+  }
+}
+
+// ── Génère une image carte OSM pour une localité ─────────────────
+async function getLocMapImage(lat, lng) {
+  if (!lat || !lng) return null;
+  try {
+    const zoom = 13;
+    const n = Math.pow(2, zoom);
+    const fLat = parseFloat(lat), fLng = parseFloat(lng);
+    const latRad = fLat * Math.PI / 180;
+    const tileXf = (fLng + 180) / 360 * n;
+    const tileYf = (1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n;
+    const tx = Math.floor(tileXf);
+    const ty = Math.floor(tileYf);
+
+    // Grille 2x2 tiles → image 512x512
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Fond gris si tuiles non disponibles
+    ctx.fillStyle = '#f0f1f3';
+    ctx.fillRect(0, 0, 512, 512);
+
+    const grid = [[tx,ty,0,0],[tx+1,ty,256,0],[tx,ty+1,0,256],[tx+1,ty+1,256,256]];
+    await Promise.all(grid.map(([x,y,ox,oy]) => new Promise(res => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { ctx.drawImage(img, ox, oy, 256, 256); res(); };
+      img.onerror = res;
+      img.src = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+    })));
+
+    // Pixel exact de la localité dans la grille
+    const px = Math.round((tileXf - tx) * 256);
+    const py = Math.round((tileYf - ty) * 256);
+
+    // Marqueur orange pulsant
+    ctx.beginPath();
+    ctx.arc(px, py, 16, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,102,0,0.2)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#FF6600';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    return canvas.toDataURL('image/png');
+  } catch(e) {
+    console.warn('[MapTile]', e);
+    return null;
   }
 }
 
