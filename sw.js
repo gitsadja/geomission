@@ -1,4 +1,4 @@
-const CACHE = 'geomission-v27';
+const CACHE = 'geomission-v28';
 const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
