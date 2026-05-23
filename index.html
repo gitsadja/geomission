@@ -2318,22 +2318,19 @@ async function exportPPT() {
         (loc.concurrence||[]).length ? `🏁 Concurrence: ${loc.concurrence.join(', ')}` : null,
       ].filter(Boolean);
 
-      if (infoRows.length) {
-        sl.addText(infoRows.join('\n'), {
-          x:0.3, y:1.15, w:5.5, h:2.4, fontSize:12, color:C.tx, fontFace:'Calibri',
-          valign:'top'
-        });
-      }
-
-      // Notes
-      if (loc.notes) {
-        sl.addShape(pptx.ShapeType.rect, { x:0.3, y:3.65, w:5.5, h:0.04, fill:{color:'E2E4E9'} });
-        sl.addText('📝 Observations terrain', { x:0.3, y:3.75, w:5.5, h:0.3, fontSize:10, bold:true, color:C.tx3, fontFace:'Calibri' });
-        sl.addText(loc.notes, { x:0.3, y:4.1, w:5.5, h:2.6, fontSize:11, color:C.tx2, fontFace:'Calibri', valign:'top', italic:true });
-      }
-
-      // ── Photos à droite ──
+      // ── Photos à droite / Layout selon disponibilité ──
       if (loc.photoCount > 0) {
+        // ── AVEC PHOTOS : layout 2 colonnes ──
+        if (infoRows.length) {
+          sl.addText(infoRows.join('\n'), {
+            x:0.3, y:1.15, w:5.5, h:2.4, fontSize:12, color:C.tx, fontFace:'Calibri', valign:'top'
+          });
+        }
+        if (loc.notes) {
+          sl.addShape(pptx.ShapeType.rect, { x:0.3, y:3.65, w:5.5, h:0.04, fill:{color:'E2E4E9'} });
+          sl.addText('📝 Observations terrain', { x:0.3, y:3.75, w:5.5, h:0.3, fontSize:10, bold:true, color:C.tx3, fontFace:'Calibri' });
+          sl.addText(loc.notes, { x:0.3, y:4.1, w:5.5, h:2.6, fontSize:11, color:C.tx2, fontFace:'Calibri', valign:'top', italic:true });
+        }
         const photos = [];
         for (let i = 0; i < Math.min(loc.photoCount, 3); i++) {
           const p = await loadPh(loc.id, i);
@@ -2349,10 +2346,41 @@ async function exportPPT() {
           sl.addImage({ data:photos[1], x:6.1, y:3.85, w:2.7, h:2.65 });
           sl.addImage({ data:photos[2], x:8.9, y:3.85, w:2.7, h:2.65 });
         }
+
       } else {
-        // Pas de photo — fond gris léger
-        sl.addShape(pptx.ShapeType.rect, { x:6.1, y:1.1, w:5.5, h:5.5, fill:{color:'F0F1F3'} });
-        sl.addText('📷\nPas de photo', { x:6.1, y:3.0, w:5.5, h:1.5, fontSize:14, color:C.tx3, fontFace:'Calibri', align:'center', valign:'middle' });
+        // ── SANS PHOTO : layout pleine largeur centré, grands textes ──
+        const W = 11.6; // largeur totale utilisable
+        const xL = 0.5; // marge gauche
+
+        // Infos en 2 colonnes si assez d'éléments
+        if (infoRows.length) {
+          const mid = Math.ceil(infoRows.length / 2);
+          const col1 = infoRows.slice(0, mid);
+          const col2 = infoRows.slice(mid);
+          sl.addText(col1.join('\n'), {
+            x:xL, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top'
+          });
+          if (col2.length) {
+            sl.addText(col2.join('\n'), {
+              x:6.1, y:1.2, w:5.5, h:2.8, fontSize:16, color:C.tx, fontFace:'Calibri', valign:'top'
+            });
+          }
+        }
+
+        // Séparateur
+        const sepY = infoRows.length > 0 ? 4.15 : 1.4;
+        sl.addShape(pptx.ShapeType.rect, { x:xL, y:sepY, w:W, h:0.04, fill:{color:'E2E4E9'} });
+
+        // Notes en pleine largeur
+        if (loc.notes) {
+          sl.addText('📝 Observations terrain', {
+            x:xL, y:sepY+0.15, w:W, h:0.35, fontSize:13, bold:true, color:C.tx3, fontFace:'Calibri'
+          });
+          sl.addText(loc.notes, {
+            x:xL, y:sepY+0.55, w:W, h: 7.5 - sepY - 0.55, fontSize:15,
+            color:C.tx2, fontFace:'Calibri', valign:'top', italic:true
+          });
+        }
       }
     }
 
