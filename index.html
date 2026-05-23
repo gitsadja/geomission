@@ -2337,12 +2337,11 @@ async function exportPPT() {
         border:{pt:1, color:'E2E4E9'}, align:'center' });
     }
 
-    pptProgress(30, `${visitedLocs.length} slides à générer…`);
-
     // ── SLIDES localités visitées ─────────────────
     const visitedLocs = visited.filter(l =>
       l.notes || l.population || l.nearestSite || l.photoCount > 0
     );
+    pptProgress(30, `${visitedLocs.length} slides à générer…`);
 
     for (let _idx = 0; _idx < visitedLocs.length; _idx++) {
       const loc = visitedLocs[_idx];
