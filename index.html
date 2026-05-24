@@ -3868,6 +3868,8 @@ function saveTrace() {
   toast(`✓ Parcours sauvegardé — ${dist.toFixed(2)} km`);
 }
 // ═══════════════════════════════════════════════
+let _coordMarker = null; // marqueur temporaire position recherchée
+
 function onMapSearch(q) {
   const clear = document.getElementById('map-srch-clear');
   const res   = document.getElementById('map-srch-results');
@@ -3875,6 +3877,26 @@ function onMapSearch(q) {
 
   if (!q.trim()) { res.classList.remove('open'); return; }
 
+  // ── Détection coordonnées GPS ──────────────────────────────────
+  // Formats acceptés : "14.8263, -16.6067" ou "14.8263 -16.6067"
+  const coordMatch = q.trim().match(/^(-?\d{1,3}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      res.innerHTML = `<div class="msr-item" onclick="goToCoords(${lat}, ${lng})">
+        <div class="msr-dot" style="background:#FF6600"></div>
+        <div style="flex:1">
+          <div class="msr-name">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          <div class="msr-meta">Coordonnées GPS — tap pour centrer</div>
+        </div>
+      </div>`;
+      res.classList.add('open');
+      return;
+    }
+  }
+
+  // ── Recherche par nom ──────────────────────────────────────────
   const norm = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const matches = locs.filter(l =>
     l.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(norm) ||
@@ -3905,6 +3927,31 @@ function onMapSearch(q) {
     </div>`;
   }).join('');
   res.classList.add('open');
+}
+
+function goToCoords(lat, lng) {
+  clearMapSearch();
+  // Supprimer ancien marqueur si existant
+  if (_coordMarker) { map.removeLayer(_coordMarker); _coordMarker = null; }
+  // Centrer et placer marqueur temporaire orange
+  map.setView([lat, lng], 15);
+  _coordMarker = L.marker([lat, lng], {
+    icon: L.divIcon({
+      html: `<div style="background:#FF6600;width:22px;height:22px;border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+      </div>`,
+      className:'', iconSize:[22,22], iconAnchor:[11,22]
+    })
+  }).addTo(map)
+    .bindPopup(`<div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;">
+      📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+      <span style="font-size:10px;color:#8a8f9e">Tap sur la carte pour supprimer</span>
+    </div>`)
+    .openPopup();
+  // Supprimer le marqueur au prochain clic sur la carte
+  map.once('click', () => {
+    if (_coordMarker) { map.removeLayer(_coordMarker); _coordMarker = null; }
+  });
 }
 
 function goToLoc(id) {
