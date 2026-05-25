@@ -176,6 +176,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 /* Rec niveau 1 */
 .rec-ok.active{background:#2e7d32;color:white;border-color:#2e7d32;}
 .rec-nok.active{background:#e53935;color:white;border-color:#e53935;}
+.rec-neval.active{background:#8a8f9e;color:white;border-color:#8a8f9e;}
 /* Rec niveau 2 OK */
 .tr-ok_macro.active{background:#e53935;border-color:#e53935;color:white;}
 .tr-ok_serenguetti.active{background:#7b1fa2;border-color:#7b1fa2;color:white;}
@@ -828,9 +829,10 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
       <!-- 13. PRÉCONISATION 2 NIVEAUX -->
       <div class="fg">
         <label class="flbl">Préconisation couverture</label>
-        <!-- Niveau 1 : OK / NOK -->
+        <!-- Niveau 1 : OK / NOK (le bouton — est masqué, état interne seulement) -->
         <div class="tgrp" style="margin-bottom:7px;">
-          <div class="tbtn rec-ok active" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
+          <div class="tbtn rec-neval" data-rl="neval" style="display:none;"></div>
+          <div class="tbtn rec-ok" data-rl="ok" onclick="selRecL1(this)" style="flex:1">✅ OK</div>
           <div class="tbtn rec-nok" data-rl="nok" onclick="selRecL1(this)" style="flex:1">❌ NOK</div>
         </div>
         <!-- Niveau 2 : sous-options OK -->
@@ -1535,7 +1537,7 @@ function sw(v) {
 // AJOUT / ÉDITION
 // ═══════════════════════════════════════════════
 function openAdd(lat, lng) {
-  cSt = 'pending'; cRec = 'ok_macro'; cRecL1 = 'ok'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
+  cSt = 'pending'; cRec = 'non_evalue'; cRecL1 = 'neval'; pendPh = []; editPh = []; pendVid = null; editVid = null; cExtra = false; cConc = [];
   document.getElementById('eid').value = '';
   document.getElementById('add-ttl').textContent = 'Nouvelle Localité';
   document.getElementById('del-btn').style.display = 'none';
@@ -1611,7 +1613,7 @@ function resetFormToggles() {
   // Statut
   document.querySelectorAll('.stg .tbtn').forEach(b => b.classList.toggle('active', b.dataset.s === cSt));
   // Rec niveau 1
-  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
+  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.toggle('active', b.dataset.rl === cRecL1));
   // Rec niveau 2
   document.getElementById('rec-ok-sub').style.display  = cRecL1 === 'ok'   ? 'flex' : 'none';
   document.getElementById('rec-nok-sub').style.display = cRecL1 === 'nok'  ? 'flex' : 'none';
@@ -1637,15 +1639,17 @@ function selS(el) {
 
 function selRecL1(el) {
   cRecL1 = el.dataset.rl;
-  document.querySelectorAll('.rec-ok,.rec-nok').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rec-ok,.rec-nok,.rec-neval').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  const isOk  = cRecL1 === 'ok';
-  const isNok = cRecL1 === 'nok';
+  const isOk   = cRecL1 === 'ok';
+  const isNok  = cRecL1 === 'nok';
+  const isNeval = cRecL1 === 'neval';
   document.getElementById('rec-ok-sub').style.display  = isOk  ? 'flex' : 'none';
   document.getElementById('rec-nok-sub').style.display = isNok ? 'flex' : 'none';
-  // Sélectionner la première sous-option par défaut
-  if (isOk)  { cRec = 'ok_macro';  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'ok_macro')); }
-  if (isNok) { cRec = 'nok_optim'; document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'nok_optim')); }
+  const vf = document.getElementById('voisin-fields');
+  if (isOk)    { cRec = 'ok_macro';   document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'ok_macro')); if(vf) vf.style.display='none'; }
+  if (isNok)   { cRec = 'nok_optim';  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('active', b.dataset.r === 'nok_optim')); if(vf) vf.style.display='none'; }
+  if (isNeval) { cRec = 'non_evalue'; document.querySelectorAll('[data-r]').forEach(b => b.classList.remove('active')); if(vf) vf.style.display='none'; }
 }
 
 function selR(el) {
@@ -2185,14 +2189,21 @@ function exportCSV() {
   const h = ['Localité','Statut','Latitude','Longitude','Population','Louma','Marché','Axe routier',
     'Potentiel','Activités économiques','Site proche','Distance km','Signal','Préconisation','Notes',
     'Date visite','Latitude_Dd','Longitude_Dd'];
-  const rows = sorted.map(l => [
-    l.name, SL[l.status], l.lat || '', l.lng || '', l.population || '', l.louma || '',
-    l.hasMarket ? 'Oui' : 'Non', l.hasRoad ? 'Oui' : 'Non',
-    l.potential || '', l.economicActivities || '', l.nearestSite || '',
-    l.distanceToSite || '', l.signalQuality || '', RL[l.recommendation || 'none'],
-    (l.notes || '').replace(/"/g, '""'), l.visitedAt ? new Date(l.visitedAt).toLocaleDateString('fr-FR') : '',
-    l.lat || '', l.lng || ''
-  ].map(v => `"${v}"`).join(','));
+  const rows = sorted.map(l => {
+    const visited = l.status === 'visited' || l.status === 'introuvable';
+    const rc = migrateRec(l.recommendation, l.status);
+    const recLabel = rc === 'non_evalue' ? '' : (RL[rc] || '');
+    return [
+      l.name, SL[l.status], l.lat || '', l.lng || '', l.population || '', l.louma || '',
+      visited ? (l.hasMarket ? 'Oui' : 'Non') : '',
+      visited ? (l.hasRoad   ? 'Oui' : 'Non') : '',
+      l.potential || '', l.economicActivities || '', l.nearestSite || '',
+      l.distanceToSite || '', l.signalQuality || '', recLabel,
+      (l.notes || '').replace(/"/g, '""'),
+      l.visitedAt ? new Date(l.visitedAt).toLocaleDateString('fr-FR') : '',
+      l.lat || '', l.lng || ''
+    ].map(v => `"${v}"`).join(',');
+  });
   const csv = '\uFEFF' + [h.join(','), ...rows].join('\n');
   dlBlob(csv, `geomission_${Date.now()}.csv`, 'text/csv;charset=utf-8');
   toast('✓ CSV exporté');
