@@ -1,18 +1,13 @@
-const CACHE = 'geomission-v29';
-const ASSETS = [
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
-  'https://cdn.jsdelivr.net/npm/leaflet-image@0.4.0/leaflet-image.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  './pptxgen.bundle.js',
-  'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
+const CACHE = 'geomission-v30';
+// On ne pré-cache que les fichiers locaux — pas les CDN externes
+const LOCAL_ASSETS = [
+  './pptxgen.bundle.js'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c =>
-      Promise.allSettled(ASSETS.map(a => c.add(a).catch(() => {})))
+      Promise.allSettled(LOCAL_ASSETS.map(a => c.add(a).catch(() => {})))
     ).then(() => self.skipWaiting())
   );
 });
@@ -31,25 +26,42 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   // index.html → toujours réseau, jamais cache
-  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html') || url.pathname === '/geomission/') {
+  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html') ||
+      url.pathname === '/geomission/' || url.pathname === '/geomission') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match(e.request))
     );
     return;
   }
 
-  // Autres ressources → cache d'abord
+  // Fichiers locaux (pptxgen.bundle.js, sw.js, manifest.json)
+  // → cache first, puis réseau
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // CDN externes (Leaflet, SheetJS, fonts…)
+  // → réseau d'abord, cache en fallback — sans pré-chargement
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => cached);
-    })
+    fetch(e.request).then(res => {
+      if (res && res.status === 200) {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });
 
