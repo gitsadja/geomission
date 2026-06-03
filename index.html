@@ -21,6 +21,7 @@
 <script src="./leaflet-image.js"></script>
 <script src="./xlsx.min.js"></script>
 <script src="./jszip.min.js"></script>
+<script src="./exceljs.min.js"></script>
 <script src="./pptxgen.bundle.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
@@ -2565,142 +2566,211 @@ async function getLocMapImageFallback(lat, lng) {
 }
 
 // ═══════════════════════════════════════════════
-// EXPORT RAPPORT DE SYNTHÈSE EXCEL (multi-onglets)
+// EXPORT RAPPORT DE SYNTHÈSE EXCEL — FORMATTÉ
 // ═══════════════════════════════════════════════
-function exportExcelReport() {
+async function exportExcelReport() {
   if (!locs.length) { toast('⚠️ Aucune donnée à exporter'); return; }
+  if (typeof ExcelJS === 'undefined') { toast('⚠️ ExcelJS non chargé'); return; }
+  toast('⏳ Génération du rapport Excel…');
   try {
-    const wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'GeoMission — Orange Sonatel';
+    wb.created = new Date();
+
     const missionName = _currentMission?.name || 'Mission';
     const today = new Date().toLocaleDateString('fr-FR');
 
-    // ── Helpers ──────────────────────────────────
-    const RC_FR = {
-      ok_macro:'Nouveau site Macro', ok_serenguetti:'Site Sérénguetti',
-      ok_voisin:'Site voisin', nok_optim:'Optimisation',
-      nok_nopotentiel:'Pas de potentiel', nok_covered:'Déjà couverte',
-      non_evalue:'Non évalué', none:'Non évalué'
+    // ── Couleurs (sans #) ──────────────────────────────
+    const CLR = {
+      orange:    'FF6600', orangeDk: 'CC4400', orangeLt: 'FFF3E6',
+      blue:      '185FA5', blueLt:   'E6F1FB',
+      green:     '3B6D11', greenLt:  'EAF3DE',
+      grey:      'F7F8FA', greyTx:   '888780',
+      white:     'FFFFFF', tx:       '0D0F14', tx2: '5F5E5A', tx3: '444441',
+      altRow:    'FFF3E6', purple:   '7B1FA2', purpleLt: 'F3E6F7'
     };
 
-    const visited = locs.filter(l => l.status === 'visited' || l.status === 'introuvable');
-    const macros  = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_macro');
-    const sereng  = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_serenguetti');
-    const optims  = locs.filter(l => migrateRec(l.recommendation, l.status) === 'nok_optim');
-    const voisins = locs.filter(l => migrateRec(l.recommendation, l.status) === 'ok_voisin');
-    const nopot   = locs.filter(l => migrateRec(l.recommendation, l.status) === 'nok_nopotentiel');
+    // ── Helper : applique le style à une cellule ──────
+    const S = (cell, opts) => {
+      if (opts.bg) cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF'+opts.bg}};
+      if (opts.color) cell.font = {...(cell.font||{}), color:{argb:'FF'+opts.color}, bold:!!opts.bold, size:opts.size||11, name:'Calibri'};
+      else if (opts.bold) cell.font = {...(cell.font||{}), bold:true, size:opts.size||11, name:'Calibri'};
+      if (opts.align) cell.alignment = {horizontal:opts.align, vertical:'middle', wrapText:!!opts.wrap};
+      if (opts.border) cell.border = {top:{style:'thin',color:{argb:'FFE2E4E9'}},bottom:{style:'thin',color:{argb:'FFE2E4E9'}},left:{style:'thin',color:{argb:'FFE2E4E9'}},right:{style:'thin',color:{argb:'FFE2E4E9'}}};
+    };
 
-    // ── Onglet RÉSUMÉ ────────────────────────────
-    const resumeData = [
-      [`Rapport de mission terrain — ${missionName}`],
-      [`Date : ${today} · ${visited.length} localités visitées sur ${locs.length}`],
-      [],
-      ['Catégorie', 'Nombre'],
-      ['Nouveaux sites Macro', macros.length],
-      ['Sites Sérénguetti', sereng.length],
-      ['Sites voisins', voisins.length],
-      ['Optimisations sites existants', optims.length],
-      ['Pas de potentiel', nopot.length],
-      ['TOTAL localités analysées', visited.length],
-      [],
-      ['Taux de visite', `${locs.length ? Math.round(visited.length/locs.length*100) : 0}%`],
+    // ── Helper : crée un onglet standardisé ──────────
+    const makeSheet = (name, headerColor, headerLightColor, columns, rows, title, subtitle) => {
+      const ws = wb.addWorksheet(name);
+      ws.properties.tabColor = {argb: 'FF'+headerColor};
+
+      // Ligne 1 : titre fusionné
+      ws.addRow([title]);
+      const r1 = ws.getRow(1);
+      r1.height = 28;
+      const c1 = ws.getCell('A1');
+      S(c1, {bg:headerColor, color:CLR.white, bold:true, size:13, align:'left'});
+      ws.mergeCells(1, 1, 1, columns.length);
+
+      // Ligne 2 : sous-titre
+      ws.addRow([subtitle]);
+      const r2 = ws.getRow(2);
+      r2.height = 16;
+      const c2 = ws.getCell('A2');
+      S(c2, {bg:headerLightColor, color:headerColor, align:'left'});
+      ws.mergeCells(2, 1, 2, columns.length);
+
+      // Ligne 3 : headers
+      ws.addRow(columns.map(c => c.label));
+      const r3 = ws.getRow(3);
+      r3.height = 22;
+      columns.forEach((col, i) => {
+        const cell = r3.getCell(i+1);
+        S(cell, {bg:headerColor, color:CLR.white, bold:true, align:'center'});
+      });
+
+      // Largeurs colonnes
+      columns.forEach((col, i) => {
+        ws.getColumn(i+1).width = col.width || 15;
+      });
+
+      // Données
+      rows.forEach((row, ri) => {
+        const wr = ws.addRow(row.map(v => v ?? ''));
+        wr.height = 16;
+        const alt = ri % 2 === 1;
+
+        row.forEach((val, ci) => {
+          const cell = wr.getCell(ci+1);
+          const col = columns[ci];
+
+          // Style par colonne
+          if (col.type === 'num') S(cell, {bg:CLR.grey, color:CLR.greyTx, align:'center'});
+          else if (col.type === 'name') S(cell, {bg: alt ? CLR.altRow : CLR.white, color:CLR.tx, bold:true, align:'left'});
+          else if (col.type === 'coords') S(cell, {bg:CLR.blueLt, color:CLR.blue, align:'center'});
+          else if (col.type === 'tag') S(cell, {bg:CLR.orangeLt, color:CLR.orangeDk, bold:true, align:'center'});
+          else if (col.type === 'rec') S(cell, {bg:CLR.greenLt, color:CLR.green, align:'center'});
+          else S(cell, {bg: alt ? CLR.altRow : CLR.white, color:CLR.tx3, align:'left', wrap:true});
+
+          cell.border = {top:{style:'thin',color:{argb:'FFE2E4E9'}},bottom:{style:'thin',color:{argb:'FFE2E4E9'}},left:{style:'thin',color:{argb:'FFE2E4E9'}},right:{style:'thin',color:{argb:'FFE2E4E9'}}};
+        });
+      });
+
+      return ws;
+    };
+
+    // ── Données ───────────────────────────────────────
+    const visited = locs.filter(l => l.status==='visited'||l.status==='introuvable');
+    const macros  = locs.filter(l => migrateRec(l.recommendation,l.status)==='ok_macro');
+    const sereng  = locs.filter(l => migrateRec(l.recommendation,l.status)==='ok_serenguetti');
+    const voisins = locs.filter(l => migrateRec(l.recommendation,l.status)==='ok_voisin');
+    const optims  = locs.filter(l => migrateRec(l.recommendation,l.status)==='nok_optim');
+    const nopot   = locs.filter(l => migrateRec(l.recommendation,l.status)==='nok_nopotentiel');
+
+    // ── Onglet RÉSUMÉ ─────────────────────────────────
+    const wsR = wb.addWorksheet('Résumé');
+    wsR.properties.tabColor = {argb:'FF'+CLR.orangeDk};
+    wsR.getColumn(1).width = 38; wsR.getColumn(2).width = 14; wsR.getColumn(3).width = 18;
+    wsR.addRow([`Synthèse — Rapport mission terrain`]);
+    wsR.getRow(1).height = 28;
+    S(wsR.getCell('A1'), {bg:CLR.orangeDk, color:CLR.white, bold:true, size:14});
+    wsR.mergeCells('A1:C1');
+    wsR.addRow(['Catégorie','Nombre','Onglet']);
+    wsR.getRow(2).height = 20;
+    ['A2','B2','C2'].forEach(c => S(wsR.getCell(c), {bg:CLR.orange, color:CLR.white, bold:true, align:'center'}));
+
+    const resumeRows = [
+      ['Nouveaux sites Macro', macros.length, 'Orange'],
+      ['Sites Sérénguetti', sereng.length, 'Bleu'],
+      ['Sites voisins', voisins.length, 'Violet'],
+      ['Optimisations sites existants', optims.length, 'Vert'],
+      ['Pas de potentiel', nopot.length, 'Orange foncé'],
+      null,
+      ['TOTAL localités analysées', visited.length, ''],
+      [`Taux de visite`, `${locs.length?Math.round(visited.length/locs.length*100):0}%`, `${visited.length} / ${locs.length}`],
     ];
-    const wsResume = XLSX.utils.aoa_to_sheet(resumeData);
-    wsResume['!cols'] = [{wch:40},{wch:15}];
-    XLSX.utils.book_append_sheet(wb, wsResume, 'Résumé');
+    resumeRows.forEach((row, i) => {
+      if (!row) { wsR.addRow([]); return; }
+      const wr = wsR.addRow(row);
+      wr.height = 16;
+      const alt = i%2===1;
+      S(wr.getCell(1), {bg:alt?CLR.orangeLt:CLR.blueLt, color:CLR.tx});
+      S(wr.getCell(2), {bg:CLR.orangeLt, color:CLR.orangeDk, bold:true, align:'center'});
+      S(wr.getCell(3), {bg:alt?CLR.orangeLt:CLR.blueLt, color:CLR.tx2, align:'center'});
+    });
 
-    // ── Onglet MACRO ─────────────────────────────
-    const macroHeader = ['#','Nom du site proposé','Localité source','Latitude','Longitude','Tags','Notes / Remarques'];
-    const macroRows = macros.map((loc, i) => [
-      i+1,
-      loc.name.replace(/_/g,' '),
-      (loc.siteVoisin || loc.name).replace(/_/g,' '),
-      loc.siteVoisinLat || loc.lat || '',
-      loc.siteVoisinLng || loc.lng || '',
-      [
-        loc.concurrence?.includes('Yas') ? 'Coloc YAS' : '',
-        loc.louma ? 'Louma' : '',
-        loc.isExtra ? 'Hors planning' : ''
-      ].filter(Boolean).join(' | '),
-      loc.notes || ''
-    ]);
-    const wsMacro = XLSX.utils.aoa_to_sheet([
-      [`Nouveaux sites Macro — Rapport mission terrain`],
-      [`${macros.length} sites — ${missionName} | Orange Sonatel DST-DR`],
-      [],
-      macroHeader,
-      ...macroRows
-    ]);
-    wsMacro['!cols'] = [{wch:4},{wch:25},{wch:25},{wch:12},{wch:12},{wch:20},{wch:50}];
-    XLSX.utils.book_append_sheet(wb, wsMacro, `Macro (${macros.length} sites)`);
-
-    // ── Onglet SÉRÉNGUETTI ───────────────────────
-    const serengHeader = ['#','Localité','Latitude','Longitude','Notes terrain'];
-    const serengRows = sereng.map((loc,i) => [
-      i+1, loc.name.replace(/_/g,' '),
-      loc.lat||'', loc.lng||'', loc.notes||''
-    ]);
-    const wsSereng = XLSX.utils.aoa_to_sheet([
-      [`Sites Sérénguetti — Rapport mission terrain`],
-      [`${sereng.length} sites — ${missionName} | Orange Sonatel DST-DR`],
-      [],
-      serengHeader,
-      ...serengRows
-    ]);
-    wsSereng['!cols'] = [{wch:4},{wch:25},{wch:12},{wch:12},{wch:60}];
-    XLSX.utils.book_append_sheet(wb, wsSereng, `Sérénguetti (${sereng.length} sites)`);
-
-    // ── Onglet SITE VOISIN ───────────────────────
-    if (voisins.length > 0) {
-      const voisinHeader = ['#','Localité visitée','Site pivot proposé','Distance (km)','Lat. pivot','Lng. pivot','Notes'];
-      const voisinRows = voisins.map((loc,i) => [
-        i+1, loc.name.replace(/_/g,' '),
-        loc.siteVoisin||'', loc.siteVoisinDist||'',
+    // ── Onglet MACRO ──────────────────────────────────
+    makeSheet(
+      `Macro (${macros.length} sites)`, CLR.orange, CLR.orangeLt,
+      [{label:'#',width:4,type:'num'},{label:'Nom du site proposé',width:28,type:'name'},
+       {label:'Localité source',width:26,type:'src'},{label:'Latitude',width:13,type:'coords'},
+       {label:'Longitude',width:13,type:'coords'},{label:'Tags',width:20,type:'tag'},
+       {label:'Notes / Remarques',width:55,type:'notes'}],
+      macros.map((loc,i) => [i+1, loc.name.replace(/_/g,' '),
+        (loc.siteVoisin||loc.name).replace(/_/g,' '),
         loc.siteVoisinLat||loc.lat||'', loc.siteVoisinLng||loc.lng||'',
-        loc.notes||''
-      ]);
-      const wsVoisin = XLSX.utils.aoa_to_sheet([
-        [`Sites voisins — Rapport mission terrain`],
-        [`${voisins.length} sites — ${missionName} | Orange Sonatel DST-DR`],
-        [],
-        voisinHeader, ...voisinRows
-      ]);
-      wsVoisin['!cols'] = [{wch:4},{wch:25},{wch:25},{wch:12},{wch:12},{wch:12},{wch:50}];
-      XLSX.utils.book_append_sheet(wb, wsVoisin, `Site voisin (${voisins.length})`);
-    }
+        [loc.concurrence?.includes('Yas')?'Coloc YAS':'', loc.louma?'Louma':'', loc.isExtra?'Hors planning':''].filter(Boolean).join(' | '),
+        loc.notes||'']),
+      `Nouveaux sites Macro — Rapport mission terrain`,
+      `${macros.length} sites — ${missionName} | Orange Sonatel DST-DR`
+    );
 
-    // ── Onglet OPTIMISATIONS ─────────────────────
-    const optimHeader = ['#','Localité visitée','Site à optimiser','Action recommandée (notes terrain)'];
-    const optimRows = optims.map((loc,i) => [
-      i+1, loc.name.replace(/_/g,' '),
-      loc.nearestSite||'', loc.notes||''
-    ]);
-    const wsOptim = XLSX.utils.aoa_to_sheet([
-      [`Actions d'optimisation — Sites existants`],
-      [`${optims.length} localités — actions sur réseau existant | ${missionName}`],
-      [],
-      optimHeader, ...optimRows
-    ]);
-    wsOptim['!cols'] = [{wch:4},{wch:25},{wch:25},{wch:70}];
-    XLSX.utils.book_append_sheet(wb, wsOptim, `Optimisations (${optims.length})`);
+    // ── Onglet SÉRÉNGUETTI ────────────────────────────
+    makeSheet(
+      `Sérénguetti (${sereng.length} sites)`, CLR.blue, CLR.blueLt,
+      [{label:'#',width:4,type:'num'},{label:'Localité',width:28,type:'name'},
+       {label:'Latitude',width:13,type:'coords'},{label:'Longitude',width:13,type:'coords'},
+       {label:'Notes terrain',width:60,type:'notes'}],
+      sereng.map((loc,i) => [i+1, loc.name.replace(/_/g,' '), loc.lat||'', loc.lng||'', loc.notes||'']),
+      `Sites Sérénguetti — Rapport mission terrain`,
+      `${sereng.length} sites — ${missionName} | Orange Sonatel DST-DR`
+    );
 
-    // ── Onglet PAS DE POTENTIEL ──────────────────
-    const nopotHeader = ['#','Localité','Latitude','Longitude','Notes'];
-    const nopotRows = nopot.map((loc,i) => [
-      i+1, loc.name.replace(/_/g,' '), loc.lat||'', loc.lng||'', loc.notes||''
-    ]);
-    const wsNopot = XLSX.utils.aoa_to_sheet([
-      [`Pas de potentiel`],
-      [`${nopot.length} localités — ${missionName}`],
-      [],
-      nopotHeader, ...nopotRows
-    ]);
-    wsNopot['!cols'] = [{wch:4},{wch:25},{wch:12},{wch:12},{wch:60}];
-    XLSX.utils.book_append_sheet(wb, wsNopot, `Pas de potentiel (${nopot.length})`);
+    // ── Onglet SITE VOISIN ────────────────────────────
+    if (voisins.length) makeSheet(
+      `Site voisin (${voisins.length})`, CLR.purple, CLR.purpleLt,
+      [{label:'#',width:4,type:'num'},{label:'Localité visitée',width:26,type:'name'},
+       {label:'Site pivot',width:24,type:'src'},{label:'Distance (km)',width:13,type:'coords'},
+       {label:'Lat. pivot',width:13,type:'coords'},{label:'Lng. pivot',width:13,type:'coords'},
+       {label:'Notes',width:55,type:'notes'}],
+      voisins.map((loc,i) => [i+1, loc.name.replace(/_/g,' '),
+        loc.siteVoisin||'', loc.siteVoisinDist||'',
+        loc.siteVoisinLat||'', loc.siteVoisinLng||'', loc.notes||'']),
+      `Sites voisins — Rapport mission terrain`,
+      `${voisins.length} sites — ${missionName} | Orange Sonatel DST-DR`
+    );
 
-    // ── Télécharger ──────────────────────────────
-    const filename = `Rapport_Mission_${missionName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    toast(`✓ Rapport Excel — ${wb.SheetNames.length} onglets exportés`);
+    // ── Onglet OPTIMISATIONS ──────────────────────────
+    makeSheet(
+      `Optimisations (${optims.length})`, CLR.green, CLR.greenLt,
+      [{label:'#',width:4,type:'num'},{label:'Localité visitée',width:26,type:'name'},
+       {label:'Site à optimiser',width:22,type:'src'},{label:'Action recommandée',width:70,type:'notes'}],
+      optims.map((loc,i) => [i+1, loc.name.replace(/_/g,' '), loc.nearestSite||'', loc.notes||'']),
+      `Actions d'optimisation — Sites existants`,
+      `${optims.length} localités — actions sur réseau existant | ${missionName}`
+    );
+
+    // ── Onglet PAS DE POTENTIEL ───────────────────────
+    makeSheet(
+      `Pas de potentiel (${nopot.length})`, CLR.orangeDk, CLR.orangeLt,
+      [{label:'#',width:4,type:'num'},{label:'Localité',width:28,type:'name'},
+       {label:'Latitude',width:13,type:'coords'},{label:'Longitude',width:13,type:'coords'},
+       {label:'Notes',width:55,type:'notes'}],
+      nopot.map((loc,i) => [i+1, loc.name.replace(/_/g,' '), loc.lat||'', loc.lng||'', loc.notes||'']),
+      `Pas de potentiel`,
+      `${nopot.length} localités — ${missionName}`
+    );
+
+    // ── Télécharger ───────────────────────────────────
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Rapport_Mission_${missionName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`✓ Rapport Excel — ${wb.worksheets.length} onglets`);
 
   } catch(e) {
     console.error('[ExcelReport]', e);
