@@ -353,7 +353,21 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
 .dup-choice.active-update{background:#1565c0;color:white;border-color:#1565c0;}
 .dup-choice.active-add{background:#2e7d32;color:white;border-color:#2e7d32;}
 
-/* MISSION MODAL */
+/* ONBOARDING — création première mission */
+.onboarding-overlay{position:fixed;inset:0;background:var(--brand);z-index:5000;
+  display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;}
+.onboarding-overlay.open{display:flex;}
+.onboarding-logo{width:64px;height:64px;background:white;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;margin-bottom:20px;
+  font-size:32px;font-weight:900;color:var(--brand);font-family:'Syne',sans-serif;}
+.onboarding-title{font-size:26px;font-weight:900;color:white;text-align:center;margin-bottom:8px;}
+.onboarding-sub{font-size:14px;color:rgba(255,255,255,.8);text-align:center;margin-bottom:32px;
+  font-family:'JetBrains Mono',monospace;line-height:1.6;}
+.onboarding-box{background:white;border-radius:var(--r);width:100%;max-width:340px;padding:20px;}
+.onboarding-box .flbl{color:var(--tx);}
+.onboarding-btn{width:100%;padding:14px;background:var(--brand);color:white;border:none;
+  border-radius:var(--r);font-family:'Syne',sans-serif;font-size:15px;font-weight:800;
+  cursor:pointer;margin-top:14px;}
 .mission-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;
   display:none;align-items:center;justify-content:center;padding:20px;}
 .mission-modal.open{display:flex;}
@@ -591,7 +605,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
     <p id="hdr-sub">Évaluation Potentiel Rural</p>
   </div>
   <div class="hchips">
-    <button class="imp-hdr-btn" onclick="openImport()">📂<span class="btn-label"> Importer</span></button>
+    <button class="imp-hdr-btn" id="btn-import-hdr" onclick="openImport()" style="display:none;">📂<span class="btn-label"> Importer</span></button>
     <button class="imp-hdr-btn" onclick="openNewMission()" style="background:rgba(255,255,255,.15);">🚩<span class="btn-label"> Mission</span></button>
   </div>
 </header>
@@ -946,7 +960,11 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
  <div class="msheet" style="max-height:96dvh">
   <div class="mhandle"></div>
   <div class="mhdr">
-    <div class="mtitle" id="imp-ttl">Importer des localités</div>
+    <div>
+      <div class="mtitle" id="imp-ttl">Importer des localités</div>
+      <div id="imp-mission-badge" style="font-size:10px;font-family:'JetBrains Mono',monospace;
+        color:var(--brand);margin-top:2px;font-weight:700;"></div>
+    </div>
     <button class="mclose" onclick="closeImp()">✕</button>
   </div>
   <div class="mbody">
@@ -1083,6 +1101,23 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--tx);
         ✓ Confirmer cette position
       </button>
     </div>
+  </div>
+</div>
+
+<!-- ONBOARDING — Création première mission -->
+<div class="onboarding-overlay" id="onboarding-overlay">
+  <div class="onboarding-logo">GM</div>
+  <div class="onboarding-title">Bienvenue sur GeoMission</div>
+  <div class="onboarding-sub">Donnez un nom à votre mission<br>pour démarrer</div>
+  <div class="onboarding-box">
+    <label class="flbl">Nom de la mission</label>
+    <input type="text" class="fi" id="onboarding-mission-name"
+      placeholder="Ex: Mission Niayes Juin 2026"
+      style="margin-top:6px;"
+      onkeydown="if(event.key==='Enter') confirmOnboarding()">
+    <button class="onboarding-btn" onclick="confirmOnboarding()">
+      🚩 Démarrer la mission
+    </button>
   </div>
 </div>
 
@@ -3230,6 +3265,34 @@ function setDupChoice(rowIndex, choice, el) {
 
 let _currentMission = null; // { id, name, createdAt }
 
+function confirmOnboarding() {
+  const name = document.getElementById('onboarding-mission-name').value.trim();
+  if (!name) {
+    document.getElementById('onboarding-mission-name').focus();
+    return;
+  }
+  _currentMission = { id: 'mission_' + Date.now(), name, createdAt: Date.now() };
+  localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
+  document.getElementById('onboarding-overlay').classList.remove('open');
+  updateMissionDisplay();
+  toast(`🚩 Mission "${name}" créée — vous pouvez importer vos localités`);
+}
+
+function checkMissionOnStartup() {
+  if (!_currentMission) {
+    if (locs.length === 0) {
+      // Pas de données, pas de mission → onboarding obligatoire
+      document.getElementById('onboarding-overlay').classList.add('open');
+      setTimeout(() => document.getElementById('onboarding-mission-name').focus(), 300);
+    } else {
+      // Données existantes sans mission → prompt non bloquant
+      setTimeout(() => {
+        toast('🚩 Donnez un nom à cette mission — bouton 🚩 Mission');
+      }, 1500);
+    }
+  }
+}
+
 function loadMission() {
   try {
     const m = localStorage.getItem('gm_current_mission');
@@ -3240,6 +3303,9 @@ function loadMission() {
 
 function updateMissionDisplay() {
   updHdr();
+  // Afficher/masquer le bouton Importer selon présence d'une mission
+  const btn = document.getElementById('btn-import-hdr');
+  if (btn) btn.style.display = _currentMission ? '' : 'none';
 }
 
 function getMissions() {
@@ -3278,50 +3344,38 @@ function closeMissionModal() {
 async function startNewMission() {
   const name = document.getElementById('new-mission-name').value.trim();
   if (!name) { toast('⚠️ Donnez un nom à la nouvelle mission'); return; }
-  if (!locs.length && !_currentMission) {
-    // Pas de données à archiver, juste nommer
-    _currentMission = { id: 'mission_' + Date.now(), name, createdAt: Date.now() };
-    localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
-    updateMissionDisplay();
-    closeMissionModal();
-    toast(`🚩 Mission "${name}" démarrée`);
-    return;
+
+  if (locs.length > 0) {
+    // Archiver la mission courante seulement si des données existent
+    const missionId = _currentMission?.id || ('mission_' + Date.now());
+    const missionName = _currentMission?.name || '(sans nom)';
+    const archive = {
+      id: missionId, name: missionName,
+      createdAt: _currentMission?.createdAt || Date.now(),
+      archivedAt: Date.now(), locCount: locs.length,
+      locs: JSON.parse(JSON.stringify(locs))
+    };
+    const missions = getMissions();
+    const idx = missions.findIndex(m => m.id === missionId);
+    if (idx >= 0) missions[idx] = archive; else missions.push(archive);
+    localStorage.setItem('gm_missions', JSON.stringify(missions));
+    locs.forEach(l => {
+      delPhs(l.id, l.photoCount || 0);
+      if (l.hasVideo) { try { savePh(l.id,'vid',null); } catch(e){} }
+    });
+    locs = [];
+    saveData();
   }
+  // Pas de données → pas d'archivage, on crée juste la nouvelle mission
 
-  // Archiver la mission courante
-  const missionId = (_currentMission?.id) || ('mission_' + Date.now());
-  const missionName = _currentMission?.name || '(sans nom)';
-  const archive = {
-    id: missionId,
-    name: missionName,
-    createdAt: _currentMission?.createdAt || Date.now(),
-    archivedAt: Date.now(),
-    locCount: locs.length,
-    locs: JSON.parse(JSON.stringify(locs)) // copie profonde
-  };
-
-  // Sauvegarder dans les missions archivées
-  const missions = getMissions();
-  const idx = missions.findIndex(m => m.id === missionId);
-  if (idx >= 0) missions[idx] = archive; else missions.push(archive);
-  localStorage.setItem('gm_missions', JSON.stringify(missions));
-
-  // Réinitialiser les données courantes
-  locs.forEach(l => {
-    delPhs(l.id, l.photoCount || 0);
-    if (l.hasVideo) savePh(l.id, 'vid', null).catch(()=>{});
-  });
-  locs = [];
-  saveData();
-
-  // Démarrer nouvelle mission
   _currentMission = { id: 'mission_' + Date.now(), name, createdAt: Date.now() };
   localStorage.setItem('gm_current_mission', JSON.stringify(_currentMission));
-
   closeMissionModal();
   refreshMap();
   updateMissionDisplay();
-  toast(`✓ Mission archivée · 🚩 "${name}" démarrée`);
+  toast(locs.length === 0
+    ? `🚩 "${name}" — importez vos localités`
+    : `✓ Archivée · 🚩 "${name}" démarrée`);
   if (document.getElementById('list-view').classList.contains('active')) renderList();
 }
 
@@ -3792,7 +3846,12 @@ function handleDrop(e) {
 }
 
 // ─── Cycle de vie modal ──────────────────────────────────
-function openImport() { resetImp(); openOv('imp-ov'); }
+function openImport() {
+  if (!_currentMission) {
+    document.getElementById('onboarding-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('onboarding-mission-name').focus(), 300);
+    return;
+  } resetImp(); openOv('imp-ov'); }
 function closeImp()   { closeOv('imp-ov'); setTimeout(resetImp, 400); }
 function resetImp() {
   impData = []; impAllHeaders = []; impMapping = {}; impPendingRows = [];
@@ -3800,6 +3859,8 @@ function resetImp() {
   document.getElementById('imp-step1').classList.add('active');
   document.getElementById('imp-step2').classList.remove('active');
   document.getElementById('imp-ttl').textContent = 'Importer des localités';
+  const badge = document.getElementById('imp-mission-badge');
+  if (badge) badge.textContent = _currentMission ? `🚩 ${_currentMission.name}` : '';
   document.getElementById('imp-dropzone').querySelector('.imp-zone-t').textContent = 'Glisser-déposer ou cliquer';
   document.getElementById('mode-add').classList.add('active');
   document.getElementById('mode-replace').classList.remove('active');
@@ -4378,6 +4439,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadData();
   loadMission();
   scheduleAutoBackup();
+  checkMissionOnStartup();
 
   // Migration données : corriger nok_covered mal attribués aux non-visités
   const corrected = migrateRecData();

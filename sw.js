@@ -1,4 +1,4 @@
-const CACHE = 'geomission-v32';
+const CACHE = 'geomission-v33';
 const LOCAL_ASSETS = [
   './leaflet.min.css',
   './leaflet.min.js',
