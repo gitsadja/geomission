@@ -9,9 +9,10 @@ alter table ingenieurs add column if not exists pwd_hash text;
 -- valeurs de role : 'Admin' | 'Manager' | 'Agent'
 
 -- 2) Ingénieurs assignés à une mission (en plus du responsable)
+--    NB : missions.id et ingenieurs.id sont de type text (UUID stockés en texte)
 create table if not exists mission_engineers (
-  mission_id   uuid references missions(id)   on delete cascade,
-  ingenieur_id uuid references ingenieurs(id) on delete cascade,
+  mission_id   text references missions(id)   on delete cascade,
+  ingenieur_id text references ingenieurs(id) on delete cascade,
   primary key (mission_id, ingenieur_id)
 );
 
