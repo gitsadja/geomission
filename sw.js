@@ -1,5 +1,6 @@
-const CACHE = 'geomission-v33';
+const CACHE = 'radioaudit-v3';
 const LOCAL_ASSETS = [
+  './db.js',
   './leaflet.min.css',
   './leaflet.min.js',
   './leaflet-image.js',
@@ -30,17 +31,19 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
 
-  // index.html → toujours réseau
-  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html') ||
-      url.pathname === '/geomission/' || url.pathname === '/geomission') {
+  // Ne JAMAIS intercepter les appels API Supabase (toujours réseau direct)
+  if (url.hostname.endsWith('supabase.co')) return;
+
+  // index.html + db.js -> réseau d'abord (fichiers qui changent souvent)
+  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html') || url.pathname.endsWith('db.js')) {
     e.respondWith(
-      fetch(e.request)
-        .catch(() => caches.match(e.request).then(r => r || new Response('Offline', {status:503})))
+      fetch(e.request).catch(() =>
+        caches.match(e.request).then(r => r || new Response('Offline', { status: 503 })))
     );
     return;
   }
 
-  // Fichiers locaux → cache first
+  // Fichiers locaux (libs, db.js) -> cache first
   if (url.origin === self.location.origin) {
     e.respondWith(
       caches.match(e.request).then(cached => {
@@ -50,14 +53,12 @@ self.addEventListener('fetch', e => {
             caches.open(CACHE).then(c => c.put(e.request, res.clone()));
           }
           return res;
-        }).catch(() => new Response('Not found', {status:404}));
+        }).catch(() => new Response('Not found', { status: 404 }));
       })
     );
     return;
   }
-
-  // Ressources externes (fonts Google, tuiles OSM…) → réseau, pas de cache SW
-  // On laisse le navigateur gérer directement sans passer par le SW
+  // Tuiles OSM, fonts -> navigateur direct (pas de cache SW)
 });
 
 self.addEventListener('message', e => {
